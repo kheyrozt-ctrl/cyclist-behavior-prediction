@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Unified Vision Console</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true">
+    <symbol id="icon-bike" viewBox="0 0 64 40"><circle cx="14" cy="28" r="10"/><circle cx="50" cy="28" r="10"/><circle cx="32" cy="28" r="2"/><path d="M14 28l11-16 7 16H14l11-16h17l8 16M32 28l10-16 3-7M42 5h9M21 9h9"/></symbol>
+    <symbol id="icon-bike-scan" viewBox="0 0 72 48"><circle cx="20" cy="31" r="9"/><circle cx="52" cy="31" r="9"/><circle cx="36" cy="31" r="2"/><path d="M20 31l10-15 6 15H20l10-15h15l7 15M36 31l9-15 3-6M45 10h8M27 13h8M8 13V7h7M57 7h7v6M8 35v6h7M57 41h7v-6"/></symbol>
+    <symbol id="icon-bike-stop" viewBox="0 0 48 40"><circle cx="9" cy="29" r="6"/><circle cx="31" cy="29" r="6"/><path d="M9 29l7-12 7 12H9l6-8h10l6 8M15 15h5M38 8v26M35 8h10v8H35z"/></symbol>
+    <symbol id="icon-bike-turn" viewBox="0 0 48 40"><circle cx="9" cy="29" r="6"/><circle cx="31" cy="29" r="6"/><path d="M9 29l7-12 7 12H9l6-8h10l6 8M15 15h5M38 32V13H27M32 8l-5 5 5 5"/></symbol>
+    <symbol id="icon-bike-route" viewBox="0 0 48 40"><circle cx="9" cy="30" r="6"/><circle cx="29" cy="30" r="6"/><path d="M9 30l7-11 6 11H9l6-7h9l5 7M16 17h5M36 32c6-5 6-13 1-18M34 15l3-3 4 1"/></symbol>
+    <symbol id="icon-wheel" viewBox="0 0 40 40"><circle cx="20" cy="20" r="15"/><circle cx="20" cy="20" r="3"/><path d="M20 5v12M20 23v12M5 20h12M23 20h12M9 9l9 9M22 22l9 9M31 9l-9 9M18 22l-9 9"/></symbol>
+  </svg>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <header class="brand">
+        <div class="mark" aria-hidden="true"><svg><use href="#icon-bike"></use></svg></div>
+        <div><strong>CYCLE INTENT</strong><small>TRAFFIC PREDICTION SYSTEM</small></div>
+        <span class="version">LOCAL</span>
+      </header>
+
+      <form id="settings">
+        <section class="section">
+          <div class="section-title"><span>01</span><h2>Prediction scenario</h2></div>
+          <div class="model-grid">
+            <label class="model-card">
+              <input type="radio" name="model" value="bus" checked>
+              <span class="radio-ui"></span>
+              <svg class="card-icon"><use href="#icon-bike-stop"></use></svg>
+              <strong>Bus stop</strong><small>Straight · Yield · Overtake</small>
+            </label>
+            <label class="model-card">
+              <input type="radio" name="model" value="intersection">
+              <span class="radio-ui"></span>
+              <svg class="card-icon"><use href="#icon-bike-turn"></use></svg>
+              <strong>Intersection</strong><small>Cross · Left · Right</small>
+            </label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span>02</span><h2>Detection input</h2></div>
+          <label class="field"><span>Pose engine</span><select name="pose"><option value="mediapipe">MediaPipe</option><option value="trt">TensorRT / trt_pose</option></select></label>
+          <label class="field"><span>Road camera</span><select name="camera" id="camera"><option value="webcam">Standard camera</option><option value="realsense">Intel RealSense</option></select></label>
+          <label class="field" id="webcam-field"><span>Camera ID</span><input name="webcam_index" type="number" min="0" max="32" value="0"></label>
+          <div class="field"><span>Video profile</span><div class="triple"><select name="width"><option>640</option><option>1280</option><option>1920</option></select><select name="height"><option>480</option><option>720</option><option>1080</option></select><select name="fps"><option>30</option><option>24</option><option>60</option></select></div></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title"><span>03</span><h2>Inference settings</h2></div>
+          <label class="field intersection-only"><span>Model fold</span><select name="intersection_fold"><option>1</option><option>2</option><option>3</option><option>4</option><option selected>5</option></select></label>
+          <label class="field"><span>Compute device</span><input name="device" placeholder="Auto (for example, cuda:0)"></label>
+          <label class="switch-row bus-only"><span><strong>Swap direction labels</strong><small>Bus-stop upper-body output only</small></span><input name="bus_swap_upper_labels" type="checkbox"><i></i></label>
+        </section>
+      </form>
+
+      <div class="actions">
+        <button class="primary" id="start" type="button"><svg><use href="#icon-bike"></use></svg>Start prediction</button>
+        <button class="stop" id="stop" type="button" disabled>Stop</button>
+        <p id="message" role="alert"></p>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div><p class="eyebrow">ROAD USER INTELLIGENCE / LIVE</p><h1>Cyclist Trajectory &amp; Intent</h1></div>
+        <div class="status-pill" id="status-pill"><i></i><span>System idle</span></div>
+      </header>
+
+      <section class="viewer-card">
+        <div class="viewer-toolbar">
+          <div><span class="live-dot"></span><strong>ROAD CAMERA 01</strong><small id="source-label">WEBCAM · 640 × 480</small></div>
+          <div class="viewer-meta"><span id="fps">0.0 FPS</span><span id="clock">00:00:00</span></div>
+        </div>
+        <div class="viewport" id="viewport">
+          <img id="stream" alt="Live cyclist prediction stream">
+          <div class="empty-state" id="empty">
+            <div class="focus-icon"><svg><use href="#icon-bike-scan"></use></svg><span></span></div>
+            <h2>No road-camera signal</h2>
+            <p>Configure the detection pipeline and start prediction</p>
+          </div>
+          <div class="scanline"></div>
+          <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+        </div>
+      </section>
+
+      <section class="telemetry">
+        <article><span class="metric-icon"><svg><use href="#icon-bike"></use></svg></span><div><small>CYCLIST TRACK</small><strong id="pose-state">Awaiting detection</strong></div><i class="indicator" id="pose-indicator"></i></article>
+        <article class="prediction"><span class="metric-icon"><svg><use href="#icon-bike-route"></use></svg></span><div><small>PREDICTED MANEUVER</small><strong id="prediction">Prediction not started</strong></div></article>
+        <article><span class="metric-icon"><svg><use href="#icon-wheel"></use></svg></span><div><small>TEMPORAL SEQUENCE</small><strong id="progress">0 / 0</strong></div><div class="mini-progress"><i id="progress-bar"></i></div></article>
+      </section>
+      <footer><span>CYCLIST INTENT PREDICTION ENGINE</span><span>ON-DEVICE PROCESSING · VIDEO REMAINS LOCAL</span></footer>
+    </main>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>
