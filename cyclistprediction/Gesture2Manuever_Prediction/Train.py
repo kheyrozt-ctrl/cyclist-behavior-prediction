@@ -6,8 +6,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, random_split
 
 # 读取CSV文件
-file_path_0 = './Output_Data/20240814_174648_skeleton_keypoints.csv'
-file_path_2 = './Output_Data/20240814_180228_skeleton_keypoints.csv'
+file_path_0 = "./Output_Data/sample_a_skeleton_keypoints.csv"
+file_path_2 = "./Output_Data/sample_b_skeleton_keypoints.csv"
 
 df_0 = pd.read_csv(file_path_0)
 df_2 = pd.read_csv(file_path_2)

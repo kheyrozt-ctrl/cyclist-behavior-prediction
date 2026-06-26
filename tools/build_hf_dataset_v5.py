@@ -10,7 +10,7 @@ import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "0cyclistprediction_v5"
-SKELETONS = SRC / "Full33SkeletonData" / "stage1_scene_clips_20260622"
+SKELETONS = SRC / "Full33SkeletonData" / "stage1_scene_clips"
 VC = SRC / "Gesture2Manuever_Prediction" / "VideoCrop"
 MD = SRC / "Gesture2Manuever_Prediction" / "ManueverPrediction_Combined" / "ManueverDataset"
 OUT = ROOT / "release" / "hf" / "cyclist-intention-2d-keypoints-v2"

@@ -1,6 +1,12 @@
 # Cyclist Prediction
 # 骑行者预测
 
+> Public repository note: raw-data filenames, dated session manifests, local
+> split lists, and generated label tables are intentionally excluded. Use the
+> anonymized Hugging Face dataset and `../tools/prepare_hf_stage2.py` for public
+> Stage2 data preparation. The legacy builders below remain for authorized
+> local-source reconstruction only.
+
 本版基于 Zheng Tian-Ana 骨架数据的两阶段骑行者预测流程和代码。添加了部分数据排除规则，修改了场景动作映射和 Stage2 等内容。
 This version is based on the Zheng Tian-Ana skeleton-data two-stage cyclist prediction pipeline and code. Some data exclusion rules, scene-action mappings, and Stage2 components were modified.
 
@@ -84,8 +90,8 @@ To run only one fold, add `--fold 1`, `--fold 2`, and so on.
 `Full33SkeletonData/` 存放完整 33 点骨架 CSV 文件。一个基于完整原视频（包含六个场景），一个基于裁剪过的场景片段。
 `Full33SkeletonData/` stores full 33-point skeleton CSV files. One set is based on full original videos with six scenes, and one set is based on cropped scene clips.
 
-`Full33SkeletonData/stage1_scene_clips_20260622/` 存放 Stage1 和 Stage2 构建使用的 559 个 scene/base-clip 骨架 CSV 文件。
-`Full33SkeletonData/stage1_scene_clips_20260622/` stores the 559 scene/base-clip skeleton CSV files used for Stage1 and Stage2 construction.
+`Full33SkeletonData/stage1_scene_clips/` stores the authorized local
+scene/base-clip skeleton CSV files used for Stage1 and Stage2 construction.
 
 `Gesture2Manuever_Prediction/` 存放所有数据生成和模型训练代码。
 `Gesture2Manuever_Prediction/` stores all data generation and model training code.

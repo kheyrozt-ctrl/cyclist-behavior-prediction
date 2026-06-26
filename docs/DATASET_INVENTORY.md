@@ -1,5 +1,11 @@
 # Local Dataset Inventory
 
+> This is a historical inventory of an ignored local working copy, not an
+> inventory of files published on GitHub or Hugging Face. The current public
+> training source is the anonymized V5 Hugging Face release described in the
+> final section. Original filenames and local label/split manifests are not
+> part of the public Git tree.
+
 ## Scope
 
 This inventory describes the dataset material currently visible in the local

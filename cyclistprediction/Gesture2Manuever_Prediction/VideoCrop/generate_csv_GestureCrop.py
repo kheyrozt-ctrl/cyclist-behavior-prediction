@@ -4,7 +4,7 @@ import pandas as pd
 def generate_crop_info_csv(directory, output_csv, num_crops=5):
     # 获取目录下所有的csv文件
     files = [f for f in os.listdir(directory) if f.endswith('.csv')]
-    # files = ['Full33SkeletonData/video1a_1_1568016169_20240819_092616_skeleton.csv']
+    # files = ["Full33SkeletonData/example_skeleton.csv"]
     
     # 创建一个空的字典列表
     rows = []

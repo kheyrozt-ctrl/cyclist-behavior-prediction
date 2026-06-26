@@ -136,6 +136,17 @@ The reproducible V5 builder is `tools/build_hf_dataset_v5.py`. Release construct
 quality gates, privacy controls, and publication details are documented in
 [`docs/PUBLIC_DATASET_RELEASE.md`](docs/PUBLIC_DATASET_RELEASE.md).
 
+For public training, use the anonymized Hugging Face release rather than local
+raw-data manifests:
+
+```bash
+python tools/prepare_hf_stage2.py --fold 1
+```
+
+This creates the `120 x 66` Stage2 PKL inputs expected by the V5 training code.
+See [`docs/PUBLIC_TRAINING.md`](docs/PUBLIC_TRAINING.md) for the exact workflow,
+scope, and reproducibility limitations.
+
 ## Holoscan graph
 
 A functional Holoscan application is provided under `deployment/holoscan/`. It
@@ -150,6 +161,9 @@ python3 deployment/holoscan/app.py --model bus --pose mediapipe
 See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). Hardware
 performance claims require measurement on the target Jetson and are not inferred
 from desktop execution.
+
+The third-party trt_pose ResNet18 checkpoint is not stored in Git. Install it
+from the upstream NVIDIA release with `bash pose_detection/download_models.sh`.
 
 ## License
 

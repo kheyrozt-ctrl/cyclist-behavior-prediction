@@ -192,7 +192,7 @@ def CropManueverData(gesture_info_path, skeleton_data_folder, train_files, val_f
 project_root = Path(__file__).resolve().parents[2]
 run_root = project_root.parent
 gesture_info_path = project_root / "Gesture2Manuever_Prediction" / "VideoCrop" / "gesture_crop_info.csv"
-skeleton_data_folder = project_root / "Full33SkeletonData" / "stage1_scene_clips_20260622"
+skeleton_data_folder = project_root / "Full33SkeletonData" / "stage1_scene_clips"
 output_dir = run_root / "release_data" / "ManueverDataset"
 
 if __name__ == "__main__":

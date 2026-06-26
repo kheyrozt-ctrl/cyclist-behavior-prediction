@@ -56,7 +56,7 @@ The 18 trt_pose keypoints are mapped to MediaPipe's 33 using direct mapping, dup
 | Architecture | BlazePose (MediaPipe) | ResNet18 + attention |
 | Inference backend | CPU (MediaPipe) | TensorRT FP16 (GPU) |
 | Input resolution | 640x480 (native) | 224x224 |
-| Expected FPS (Orin) | ~15-25 | ~200+ |
+| Measured FPS | Not benchmarked here | Not benchmarked here |
 | Coordinate format | Normalized [0,1] | Normalized [0,1] |
 
 ## Keypoint Mapping Methodology

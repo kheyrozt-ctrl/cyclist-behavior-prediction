@@ -26,7 +26,8 @@ Real-time human skeleton pose detection using an Intel RealSense D435 depth came
 - Input: 224x224 RGB image, ImageNet-normalized
 - Output: 18 COCO keypoints (nose, eyes, ears, shoulders, elbows, wrists, hips, knees, ankles) + part affinity fields
 - Inference backend: PyTorch CUDA (with optional TensorRT acceleration)
-- Expected performance: **30-60+ FPS** on Orin with PyTorch CUDA, **200+ FPS** with TensorRT
+- Performance: not benchmarked in this repository; measure throughput and
+  latency on the target Jetson, software stack, power mode, and camera profile
 
 ## Project Structure
 
@@ -92,7 +93,9 @@ Press `q` to quit (live mode) or `Ctrl+C` (headless mode).
 
 ## Fallback: OpenCV DNN
 
-A lightweight fallback script that uses OpenCV's DNN module with an OpenPose Caffe model. No PyTorch or TensorRT required — only OpenCV. Runs at ~2-5 FPS on CPU.
+A lightweight fallback script that uses OpenCV's DNN module with an OpenPose
+Caffe model. No PyTorch or TensorRT is required. CPU throughput is
+hardware-dependent and is not claimed here.
 
 ```bash
 python3 fallback_dnn.py
