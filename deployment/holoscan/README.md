@@ -38,19 +38,26 @@ without a camera or display:
 ```bash
 python3 -m pip install -r requirements-unified.txt
 python3 deployment/holoscan/app.py \
-  --model bus \
+  --model synthetic \
   --camera synthetic \
   --pose synthetic \
   --headless \
   --duration 15 \
+  --torch-threads 1 \
   --output-jsonl holoscan_predictions.jsonl
 ```
 
 The synthetic source runs at the requested `--fps`, supplies deterministic
 normalized 33-point poses, stops automatically, and writes one structured JSON
-record per frame. It validates graph composition, message flow, model loading,
-buffer progression, and output serialization. It is not camera, pose-estimation,
-accuracy, latency, power, thermal, or production-hardware evidence.
+record per frame. It validates graph composition, message flow, synthetic
+predictor state progression, and output serialization. It does not
+execute the packaged Torch models and is not camera, pose-estimation, accuracy,
+latency, power, thermal, or production-hardware evidence.
+
+`--torch-threads` applies only to the real `bus` and `intersection` model modes.
+
+See `docs/HOLOSCAN_SIMULATION_VALIDATION.md` for the recorded container,
+hardware, command, verified outputs, and explicit validation boundary.
 
 On Windows, an activated virtual environment provides `python.exe`, not
 necessarily `python3.exe`. Therefore `python3` can resolve to the Microsoft

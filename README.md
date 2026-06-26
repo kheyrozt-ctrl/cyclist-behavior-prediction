@@ -162,9 +162,14 @@ python3 -m pip install -r deployment/holoscan/requirements.txt
 python3 deployment/holoscan/app.py --model bus --pose mediapipe
 ```
 
-See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). The source
-is syntax-checked, but successful Holoscan execution and hardware performance
-require measurement on the target Linux/Jetson device.
+See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). The
+synthetic graph is runtime-validated; production-model execution and hardware
+performance still require validation on the target Linux/Jetson device.
+
+The deterministic headless graph was executed in the official Holoscan 3.11
+container. See
+[`docs/HOLOSCAN_SIMULATION_VALIDATION.md`](docs/HOLOSCAN_SIMULATION_VALIDATION.md)
+for the verified outputs and limitations.
 
 The third-party trt_pose ResNet18 checkpoint is not stored in Git. Install it
 from the upstream NVIDIA release with `bash pose_detection/download_models.sh`.
