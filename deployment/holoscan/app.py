@@ -13,7 +13,24 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from holoscan.core import Application, Operator, OperatorSpec
+if sys.platform == "win32":
+    raise SystemExit(
+        "NVIDIA Holoscan SDK is not available as a native Windows Python "
+        "runtime. Run this graph on a supported Linux x86_64/CUDA or Jetson "
+        "environment. On Windows, use: "
+        r".venv\Scripts\python.exe unified_prediction\run_web.py"
+    )
+
+try:
+    from holoscan.core import Application, Operator, OperatorSpec
+except ModuleNotFoundError as exc:
+    if exc.name != "holoscan":
+        raise
+    raise SystemExit(
+        "Holoscan SDK is not installed in this interpreter. On supported "
+        "Linux/Jetson systems run: "
+        "python3 -m pip install -r deployment/holoscan/requirements.txt"
+    ) from exc
 
 
 class CameraOp(Operator):

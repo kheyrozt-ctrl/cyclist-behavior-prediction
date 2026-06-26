@@ -1,13 +1,10 @@
-ManueverDataset stores Stage2 fold/subset split CSV files.
-ManueverDataset 存放 Stage2 fold/subset 划分 CSV 文件。
+This directory is a placeholder for generated local Stage2 data.
 
-The files are named `fold_{1..5}_{train,val,test}_data.csv`.
-文件命名为 `fold_{1..5}_{train,val,test}_data.csv`。
+Source-derived split CSV files and PKL windows are intentionally excluded from
+the public Git repository. Generate anonymized fold PKL files from the public
+Hugging Face release with:
 
-These CSV files define which scene/base-clip skeletons belong to each fold and subset.
-这些 CSV 定义每个 scene/base-clip 骨架属于哪个 fold 和 subset。
+    python tools/prepare_hf_stage2.py --fold 1
 
-They are used by `../../VideoCrop/ManueverCrop_combine.py` to build Stage2 pkl windows.
-它们由 `../../VideoCrop/ManueverCrop_combine.py` 用于生成 Stage2 pkl 窗口。
-
-
+The generated files are written under release_data/ManueverDataset by default
+and remain ignored by Git.

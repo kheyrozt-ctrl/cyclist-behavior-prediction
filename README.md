@@ -149,18 +149,22 @@ scope, and reproducibility limitations.
 
 ## Holoscan graph
 
-A functional Holoscan application is provided under `deployment/holoscan/`. It
+A reference Holoscan application is provided under `deployment/holoscan/`. It
 separates camera acquisition, pose/model inference, and display/structured
 prediction publication into operators:
+
+The NVIDIA Holoscan runtime must be run on a supported Linux x86_64/CUDA or
+Jetson environment; it is not available as a native Windows Python runtime.
+On Windows, use `.\.venv\Scripts\python.exe unified_prediction\run_web.py`.
 
 ```bash
 python3 -m pip install -r deployment/holoscan/requirements.txt
 python3 deployment/holoscan/app.py --model bus --pose mediapipe
 ```
 
-See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). Hardware
-performance claims require measurement on the target Jetson and are not inferred
-from desktop execution.
+See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). The source
+is syntax-checked, but successful Holoscan execution and hardware performance
+require measurement on the target Linux/Jetson device.
 
 The third-party trt_pose ResNet18 checkpoint is not stored in Git. Install it
 from the upstream NVIDIA release with `bash pose_detection/download_models.sh`.

@@ -108,32 +108,24 @@ scene/base-clip skeleton CSV files used for Stage1 and Stage2 construction.
 `Gesture2Manuever_Prediction/ManueverPrediction_Combined/` 存放 Stage2 组合机动行为分类器。
 `Gesture2Manuever_Prediction/ManueverPrediction_Combined/` stores the Stage2 combined maneuver classifier.
 
-`Gesture2Manuever_Prediction/ManueverPrediction_Combined/ManueverDataset/` 存放 Stage2 的 fold/subset CSV 划分文件。
-`Gesture2Manuever_Prediction/ManueverPrediction_Combined/ManueverDataset/` stores the Stage2 fold/subset CSV split files.
+`Gesture2Manuever_Prediction/ManueverPrediction_Combined/ManueverDataset/` is
+a placeholder for locally generated Stage2 inputs. Generated files are ignored.
 
-## 重要数据文件
-## Important Data Files
+## Public Data Inputs
 
-`Gesture2Manuever_Prediction/VideoCrop/gesture_crop_info.csv` 是主要动作区间和 scene 元数据表。
-`Gesture2Manuever_Prediction/VideoCrop/gesture_crop_info.csv` is the main action interval and scene metadata table.
+Source-derived label tables, fold lists, blocker lists, original filenames,
+recording dates, and internal paths are private release inputs and are not
+included in the public Git repository.
 
-`gesture_crop_info.csv` 包含 Stage1 动作区间、exclude/disable 行、骨架路径、`route_anchor`/场景号（非顺序）和 `maneuver_label`。
-`gesture_crop_info.csv` contains Stage1 action intervals, exclude/disable rows, skeleton paths, `route_anchor`/scene number (not order), and `maneuver_label`.
+The canonical public input is the anonymized Hugging Face dataset. It contains:
 
-当前交付的 `gesture_crop_info.csv` 应校验为 2093 行、466 条 exclude/disable 行、243 个受影响片段。
-The delivered `gesture_crop_info.csv` should validate as 2093 rows, 466 exclude/disable rows, and 243 affected clips.
+- participant-disjoint assignments for all five folds;
+- anonymized Stage1 intervals in `annotations.parquet`;
+- clip-level labels and eligibility in `sequences.csv`;
+- 66-coordinate skeleton frames in split Parquet files.
 
-`Gesture2Manuever_Prediction/VideoCrop/fold_{1..5}_{train,val,test}_files.txt` 定义 Stage1 的 fold 划分。
-`Gesture2Manuever_Prediction/VideoCrop/fold_{1..5}_{train,val,test}_files.txt` defines the Stage1 fold split.
-
-`Gesture2Manuever_Prediction/VideoCrop/stage1_exact_targets.txt` 存放 Stage1 每类 balanced 目标数量。
-`Gesture2Manuever_Prediction/VideoCrop/stage1_exact_targets.txt` stores the Stage1 balanced target count for each class.
-
-`Gesture2Manuever_Prediction/VideoCrop/stage2_excluded_18_baseclips.txt` 存放 Stage2 需要整段排除的 18 个 base clip，大多因为非法/危险骑行姿态。
-`Gesture2Manuever_Prediction/VideoCrop/stage2_excluded_18_baseclips.txt` stores the 18 base clips that Stage2 excludes as whole clips because of illegal/dangerous riding posture.
-
-`Gesture2Manuever_Prediction/ManueverPrediction_Combined/ManueverDataset/fold_{1..5}_{train,val,test}_data.csv` 定义 Stage2 的 fold/subset scene 划分。
-`Gesture2Manuever_Prediction/ManueverPrediction_Combined/ManueverDataset/fold_{1..5}_{train,val,test}_data.csv` defines the Stage2 fold/subset scene split.
+Run `python tools/prepare_hf_stage2.py --fold 1` from the repository root to
+generate public Stage2 PKL inputs. See `docs/PUBLIC_TRAINING.md`.
 
 ## 第一阶段逻辑
 ## Stage1 Logic
@@ -168,8 +160,7 @@ Stage2 predicts `straight`, `yield`, and `overtake`.
 Stage2 只根据 `route_anchor` 列排除官方 `route_anchor in {3,5}` 的数据。
 Stage2 excludes data with official `route_anchor in {3,5}` only according to the `route_anchor` column.
 
-Stage2 还会排除 `stage2_excluded_18_baseclips.txt` 中列出的 18 个整段 blocker。
-Stage2 also excludes the 18 whole-clip blockers listed in `stage2_excluded_18_baseclips.txt`.
+Stage2 uses only clips marked `stage2_eligible` in the public dataset.
 
 Stage2 dense window 使用固定 12 Hz 重采样、10 秒、120 帧。
 Stage2 dense windows use fixed 12 Hz resampling, 10 seconds, and 120 frames.

@@ -86,21 +86,12 @@ Runtime behavior:
 - If head direction is correct but upper-limb left/right appears reversed, use `--swap-upper-labels`. This only changes the displayed Stage1 upper-limb label and does not alter the Stage2 feature sequence.
 
 
-## Historical local results (Fold 3, V4/V3 data)
+## Evaluation status
 
-The values below were copied from legacy local experiment notes. The
-corresponding immutable dataset snapshot, run manifest, and evaluation artifact
-are not published in this repository, so these numbers are not independently
-reproducible and must not be presented as validated public-release results.
-
-
-| Branch | Test Accuracy |
-|--------|---------------|
-| Head   | 81.75%        |
-| Upper  | 85.07%        |
-| Leg    | 95.28%        |
-| Stage2 | 78.62%        |
-
+This repository does not publish validated accuracy values for these packaged
+legacy checkpoints. Report model quality only from a reproducible evaluation
+that records the dataset revision, participant fold, code commit, configuration,
+checkpoint hash, and per-class metrics.
 
 
 

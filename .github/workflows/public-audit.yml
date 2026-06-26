@@ -1,0 +1,30 @@
+name: Public repository audit
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Check public privacy boundary and file sizes
+        run: python tools/check_public_privacy.py
+      - name: Compile Python sources
+        run: >-
+          python -m compileall -q
+          tools
+          deployment/holoscan
+          unified_prediction
+          cyclist_inference
+          model_package
+          0cyclistprediction_v5/Gesture2Manuever_Prediction
