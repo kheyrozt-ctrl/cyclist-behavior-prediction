@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install simulation test dependencies
+        run: python -m pip install "numpy>=1.24,<2" "opencv-python-headless>=4.8"
       - name: Check public privacy boundary and file sizes
         run: python tools/check_public_privacy.py
       - name: Compile Python sources
@@ -28,3 +30,5 @@ jobs:
           cyclist_inference
           model_package
           0cyclistprediction_v5/Gesture2Manuever_Prediction
+      - name: Test deterministic Holoscan simulation inputs
+        run: python -m unittest deployment.holoscan.test_simulation -v
