@@ -20,6 +20,38 @@ python3 -m pip install -r deployment/holoscan/requirements.txt
 python3 deployment/holoscan/app.py --model bus --pose mediapipe
 ```
 
+## Headless simulation
+
+Use the official CUDA 12 dGPU container on an Ubuntu workstation or cloud GPU:
+
+```bash
+docker pull nvcr.io/nvidia/clara-holoscan/holoscan:v3.11.0-cuda12-dgpu
+docker run --rm --gpus all -it \
+  -v "$PWD:/workspace" \
+  -w /workspace \
+  nvcr.io/nvidia/clara-holoscan/holoscan:v3.11.0-cuda12-dgpu
+```
+
+Inside the container, install the application dependencies and run the graph
+without a camera or display:
+
+```bash
+python3 -m pip install -r requirements-unified.txt
+python3 deployment/holoscan/app.py \
+  --model bus \
+  --camera synthetic \
+  --pose synthetic \
+  --headless \
+  --duration 15 \
+  --output-jsonl holoscan_predictions.jsonl
+```
+
+The synthetic source runs at the requested `--fps`, supplies deterministic
+normalized 33-point poses, stops automatically, and writes one structured JSON
+record per frame. It validates graph composition, message flow, model loading,
+buffer progression, and output serialization. It is not camera, pose-estimation,
+accuracy, latency, power, thermal, or production-hardware evidence.
+
 On Windows, an activated virtual environment provides `python.exe`, not
 necessarily `python3.exe`. Therefore `python3` can resolve to the Microsoft
 Store interpreter outside the virtual environment. Use
