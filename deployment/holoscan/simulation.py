@@ -19,6 +19,16 @@ _POSE_TEMPLATE = (
     (0.61, 0.87), (0.38, 0.89), (0.62, 0.89), (0.41, 0.91),
     (0.59, 0.91),
 )
+SYNTHETIC_LABELS = ("straight", "yield", "overtake")
+
+
+def synthetic_label(frame_count: int, fps: int) -> str:
+    """Return a deterministic validation label after a one-second warm-up."""
+    rate = max(int(fps), 1)
+    if frame_count < rate:
+        return "warming_up"
+    index = ((frame_count - rate) // (rate * 3)) % len(SYNTHETIC_LABELS)
+    return SYNTHETIC_LABELS[index]
 
 
 def synthetic_keypoints(frame_index: int, fps: float) -> list[float]:

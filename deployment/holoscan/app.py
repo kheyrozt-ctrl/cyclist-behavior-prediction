@@ -15,7 +15,11 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from deployment.holoscan.simulation import synthetic_frame, synthetic_keypoints
+from deployment.holoscan.simulation import (
+    synthetic_frame,
+    synthetic_keypoints,
+    synthetic_label,
+)
 
 if sys.platform == "win32":
     raise SystemExit(
@@ -74,7 +78,7 @@ class CameraOp(Operator):
         ok, frame = self.capture.read()
         if not ok:
             raise RuntimeError("Camera frame acquisition failed")
-        op_output.emit(frame, "frame")
+        op_output.emit({"frame": frame, "timestamp": time.time()}, "frame")
 
     def stop(self):
         if self.capture is not None:
@@ -96,6 +100,7 @@ class SyntheticCameraOp(Operator):
         self.width, self.height, self.fps = width, height, fps
         self.duration = duration
         self.started_at = None
+        self.started_wall = None
         self.frame_index = 0
 
     def setup(self, spec: OperatorSpec):
@@ -103,6 +108,7 @@ class SyntheticCameraOp(Operator):
 
     def start(self):
         self.started_at = time.monotonic()
+        self.started_wall = time.time()
 
     def compute(self, op_input, op_output, context):
         target_time = self.started_at + self.frame_index / max(self.fps, 1)
@@ -115,8 +121,9 @@ class SyntheticCameraOp(Operator):
             self.height,
             self.fps,
         )
+        timestamp = self.started_wall + self.frame_index / max(self.fps, 1)
         self.frame_index += 1
-        op_output.emit(frame, "frame")
+        op_output.emit({"frame": frame, "timestamp": timestamp}, "frame")
 
 
 class SyntheticPoseAdapter:
@@ -145,10 +152,32 @@ class SyntheticPoseAdapter:
         pass
 
 
+class SyntheticPredictor:
+    title = "Synthetic graph-validation predictor"
+
+    def __init__(self, fps):
+        self.fps = max(int(fps), 1)
+        self.frame_count = 0
+        self.label = "warming_up"
+
+    def update(self, _keypoints, _timestamp):
+        self.frame_count += 1
+        self.label = synthetic_label(self.frame_count, self.fps)
+
+    def overlay_lines(self):
+        return [
+            (f"Synthetic maneuver: {self.label}", (80, 220, 255)),
+            (f"Simulation frames: {self.frame_count}", (255, 255, 255)),
+        ]
+
+    def progress(self):
+        return min(self.frame_count, self.fps), self.fps
+
+
 class CyclistPredictionOp(Operator):
     def __init__(self, fragment, *, args, **kwargs):
         super().__init__(fragment, **kwargs)
-        self.args = args
+        self.runtime_args = args
         self.pose = self.predictor = None
 
     def setup(self, spec: OperatorSpec):
@@ -157,19 +186,33 @@ class CyclistPredictionOp(Operator):
         spec.output("prediction")
 
     def start(self):
-        from unified_prediction.predictors import create_predictor
-        if self.args.pose == "synthetic":
-            self.pose = SyntheticPoseAdapter(self.args.fps)
+        if self.runtime_args.pose == "synthetic":
+            self.pose = SyntheticPoseAdapter(self.runtime_args.fps)
         else:
             from cyclist_inference.pose_adapter import create_pose_adapter
-            self.pose = create_pose_adapter(self.args.pose)
-        self.predictor = create_predictor(self.args)
+            self.pose = create_pose_adapter(self.runtime_args.pose)
+        if self.runtime_args.model == "synthetic":
+            self.predictor = SyntheticPredictor(self.runtime_args.fps)
+        else:
+            import torch
+            torch.set_num_threads(self.runtime_args.torch_threads)
+            try:
+                torch.set_num_interop_threads(1)
+            except RuntimeError:
+                pass
+            from unified_prediction.predictors import create_predictor
+            self.predictor = create_predictor(self.runtime_args)
         self.frame_index = 0
 
     def compute(self, op_input, op_output, context):
         from unified_prediction.runtime import draw_overlay
-        frame = op_input.receive("frame")
-        now = time.time()
+        packet = op_input.receive("frame")
+        if isinstance(packet, dict):
+            frame = packet["frame"]
+            now = float(packet["timestamp"])
+        else:
+            frame = packet
+            now = time.time()
         self.pose.process(frame)
         keypoints = self.pose.extract_keypoints()
         if keypoints is not None:
@@ -282,6 +325,7 @@ def runtime_args(cli):
         width=cli.width, height=cli.height, fps=cli.fps, device=cli.device,
         duration=cli.duration, headless=cli.headless,
         output_jsonl=cli.output_jsonl,
+        torch_threads=cli.torch_threads,
         bus_swap_upper_labels=False, intersection_fold=5,
         bus_config=None, bus_head_model=None, bus_upper_model=None,
         bus_leg_model=None, bus_stage2_model=None,
@@ -292,7 +336,11 @@ def runtime_args(cli):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model", choices=("bus", "intersection"), default="bus")
+    parser.add_argument(
+        "--model",
+        choices=("bus", "intersection", "synthetic"),
+        default="bus",
+    )
     parser.add_argument("--camera", choices=("webcam", "synthetic"), default="webcam")
     parser.add_argument("--pose", choices=("mediapipe", "trt", "synthetic"))
     parser.add_argument("--webcam-index", type=int, default=0)
@@ -303,7 +351,10 @@ def main():
     parser.add_argument("--duration", type=float, default=0.0)
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--output-jsonl", type=Path)
+    parser.add_argument("--torch-threads", type=int, default=1)
     cli = parser.parse_args()
+    if cli.torch_threads < 1:
+        parser.error("--torch-threads must be at least 1")
     if cli.pose is None:
         cli.pose = "synthetic" if cli.camera == "synthetic" else "mediapipe"
     if cli.camera == "synthetic" and cli.duration <= 0:

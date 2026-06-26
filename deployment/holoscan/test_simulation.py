@@ -4,7 +4,11 @@ import unittest
 
 import numpy as np
 
-from deployment.holoscan.simulation import synthetic_frame, synthetic_keypoints
+from deployment.holoscan.simulation import (
+    synthetic_frame,
+    synthetic_keypoints,
+    synthetic_label,
+)
 
 
 class SimulationTest(unittest.TestCase):
@@ -19,6 +23,13 @@ class SimulationTest(unittest.TestCase):
         frame = synthetic_frame(3, 320, 240, 30)
         self.assertEqual(frame.shape, (240, 320, 3))
         self.assertEqual(frame.dtype, np.uint8)
+
+    def test_labels_cover_all_synthetic_states(self):
+        labels = {synthetic_label(frame, 30) for frame in range(450)}
+        self.assertEqual(
+            labels,
+            {"warming_up", "straight", "yield", "overtake"},
+        )
 
 
 if __name__ == "__main__":
