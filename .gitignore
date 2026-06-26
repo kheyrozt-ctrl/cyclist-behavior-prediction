@@ -1,0 +1,72 @@
+# Python/runtime noise
+__pycache__/
+*.py[cod]
+*.pyo
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Local editor/agent settings
+.claude/
+.agents/
+.codex/
+
+# Generated media and temporary outputs
+*.avi
+*.mp4
+*.mov
+*.mkv
+*.log
+*.tmp
+bus_stop_output.*
+pose_output.*
+
+# Notebook autosaves
+.ipynb_checkpoints/
+
+# Nested repository history backups after flattening this workspace into one repo
+.nested_git_backups/
+
+# Generated public-release packages and private pseudonymization material
+release/
+.release-secrets/
+
+# V5 local datasets and generated training artifacts (code/metadata stay public)
+0cyclistprediction_v5/Full33SkeletonData/
+0cyclistprediction_v5/**/GestureDataset/
+0cyclistprediction_v5/**/ManueverDataset/*.pkl
+0cyclistprediction_v5/**/ManueverDataset/*.csv
+0cyclistprediction_v5/**/VideoCrop/fold_*_files.txt
+0cyclistprediction_v5/**/VideoCrop/gesture_crop_info*.csv
+0cyclistprediction_v5/**/VideoCrop/stage2_excluded_*_baseclips.txt
+0cyclistprediction_v5/release_data/
+0cyclistprediction_v5/release_runs/
+cyclistprediction-Version5/
+
+# Large training/raw datasets that are not needed for real-time inference
+cyclistprediction/Full33SkeletonData/
+cyclistprediction/GestureDataset/
+cyclistprediction/Results/
+
+# Large serialized training datasets/caches.
+# Keep trained inference weights such as best_model_fold_*.pkl and .pt/.pth files.
+cyclistprediction/Gesture2Manuever_Prediction/**/GestureDataset/
+cyclistprediction/Gesture2Manuever_Prediction/**/ImplicitGestureDataset/
+cyclistprediction/Gesture2Manuever_Prediction/**/ExplicitGestureDataset/
+cyclistprediction/Gesture2Manuever_Prediction/**/ManueverDataset/
+cyclistprediction/Gesture2Manuever_Prediction/**/*dataloader*.pkl
+cyclistprediction/Gesture2Manuever_Prediction/**/dataloader.pkl
+cyclistprediction/Gesture2Manuever_Prediction/VideoCrop/*.pkl
+cyclistprediction/Gesture2Manuever_Prediction/VideoCrop/VideoCrop.csv
+cyclistprediction/Gesture2Manuever_Prediction/VideoCrop/fold_*_files.txt
+cyclistprediction/Gesture2Manuever_Prediction/VideoCrop/gesture_crop_info*.csv
+
+# Third-party weights are downloaded from their upstream release.
+pose_detection/models/resnet18_baseline_att_224x224_A_epoch_249.pth
