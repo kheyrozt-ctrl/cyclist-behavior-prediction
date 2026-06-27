@@ -159,17 +159,23 @@ On Windows, use `.\.venv\Scripts\python.exe unified_prediction\run_web.py`.
 
 ```bash
 python3 -m pip install -r deployment/holoscan/requirements.txt
-python3 deployment/holoscan/app.py --model bus --pose mediapipe
+python3 deployment/holoscan/app.py \
+  --model bus \
+  --runtime onnx \
+  --onnx-model-dir model_package/onnx \
+  --pose mediapipe
 ```
 
-See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). The
-synthetic graph is runtime-validated; production-model execution and hardware
-performance still require validation on the target Linux/Jetson device.
+See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). The bus
+ONNX model path is runtime-validated; hardware performance still requires
+measurement on the target Linux/Jetson device.
 
-The deterministic headless graph was executed in the official Holoscan 3.11
-container. See
+The deterministic graph and the real bus ONNX predictor were executed in the
+official Holoscan 3.11 container. See
 [`docs/HOLOSCAN_SIMULATION_VALIDATION.md`](docs/HOLOSCAN_SIMULATION_VALIDATION.md)
-for the verified outputs and limitations.
+for the verified outputs and limitations, and
+[`docs/MODEL_EXPORT_EQUIVALENCE.md`](docs/MODEL_EXPORT_EQUIVALENCE.md) for the
+TorchScript-to-ONNX numerical-equivalence audit.
 
 The third-party trt_pose ResNet18 checkpoint is not stored in Git. Install it
 from the upstream NVIDIA release with `bash pose_detection/download_models.sh`.

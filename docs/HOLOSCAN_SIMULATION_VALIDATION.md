@@ -2,9 +2,10 @@
 
 ## Status
 
-The deterministic synthetic graph completed successfully on 2026-06-27. This
-is runtime evidence for Holoscan graph composition and message flow, not
-production-model or target-device performance evidence.
+The deterministic synthetic graph and the packaged bus ONNX predictor both
+completed successfully on 2026-06-27. This is runtime evidence for graph
+composition, message flow, and real model execution. It is not target-device
+performance or prediction-accuracy evidence.
 
 ## Environment
 
@@ -41,17 +42,49 @@ python3 deployment/holoscan/app.py \
 - final progress: `30/30`
 - scheduler reported graph execution finished and destroyed its context
 
+## Real bus-model validation
+
+The source and pose were kept deterministic so this run isolates the packaged
+model and graph integration:
+
+```bash
+python3 deployment/holoscan/app.py \
+  --model bus \
+  --runtime onnx \
+  --onnx-model-dir model_package/onnx \
+  --camera synthetic \
+  --pose synthetic \
+  --headless \
+  --duration 15 \
+  --fps 30 \
+  --output-jsonl release/holoscan-onnx-real-model.jsonl
+```
+
+Verified results:
+
+- process exit code: `0`
+- structured JSONL records: `450`, continuous frame range `0..449`
+- pose status: `450/450` records reported `pose_ok=true`
+- first Stage1 prediction: frame `39`
+- Stage2 feature buffer reached `120/120`
+- first Stage2 prediction: frame `396`, `overtake (0.81)`
+- final Stage2 prediction: `overtake (0.83)`
+- scheduler reported graph execution finished and destroyed its context
+- no traceback, segmentation fault, timeout, or worker-process failure
+
+These labels and confidence values come from deterministic synthetic poses and
+are integration fixtures, not accuracy measurements.
+
 ## Boundary
 
-This run validates the synthetic source, synthetic pose adapter, synthetic
-predictor, operator connections, fixed-count scheduling, headless sink, and
-JSONL serialization. It does not validate camera acquisition, MediaPipe,
-trt_pose, packaged Torch model inference, prediction accuracy, real-time
-latency, power, thermal behavior, or Jetson deployment.
+The runs validate the synthetic source and pose adapter, packaged bus ONNX
+models, process-isolated inference bridge, operator connections, fixed-count
+scheduling, headless sink, and JSONL serialization. They do not validate camera
+acquisition, MediaPipe, trt_pose, direct PyTorch inference inside a GXF worker,
+prediction accuracy, real-time latency, power, thermal behavior, or Jetson
+deployment.
 
-An attempted packaged bus-model run in this specific Holoscan 3.11 container
-encountered a native PyTorch/Python crash when Torch APIs were called from the
-GXF worker thread. The standalone TorchScript checkpoints loaded and executed
-outside that worker. Production integration therefore still requires a
-target-supported Torch/LibTorch configuration or isolation of model inference
-from the GXF Python worker.
+Direct PyTorch and ONNX Runtime calls from the GXF Python worker both produced
+a native Python thread-state crash at the first Stage1 inference. The validated
+ONNX path fixes that integration issue by running ONNX Runtime in a spawned
+process and exchanging ordered requests through bounded synchronous queues.

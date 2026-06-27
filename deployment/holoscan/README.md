@@ -17,8 +17,21 @@ Install the graph on the supported Linux/Jetson environment:
 
 ```bash
 python3 -m pip install -r deployment/holoscan/requirements.txt
-python3 deployment/holoscan/app.py --model bus --pose mediapipe
+python3 deployment/holoscan/app.py \
+  --model bus \
+  --runtime onnx \
+  --onnx-model-dir model_package/onnx \
+  --pose mediapipe
 ```
+
+The ONNX bus-model path runs inference in a spawned Python process. This is
+intentional: calling PyTorch or ONNX Runtime directly from the GXF Python
+operator worker caused a native Python thread-state crash in Holoscan 3.11.
+The graph uses synchronous, bounded IPC so frame and prediction ordering remain
+deterministic. `--onnx-worker-timeout` controls the startup and inference
+timeout (default: 120 seconds). ONNX is the default bus runtime and
+`model_package/onnx` is the default model directory; the flags are shown
+explicitly above for reproducibility.
 
 ## Headless simulation
 
@@ -54,10 +67,13 @@ predictor state progression, and output serialization. It does not
 execute the packaged Torch models and is not camera, pose-estimation, accuracy,
 latency, power, thermal, or production-hardware evidence.
 
-`--torch-threads` applies only to the real `bus` and `intersection` model modes.
+`--torch-threads` applies only to the direct PyTorch runtime. The validated bus
+path is `--runtime onnx`.
 
 See `docs/HOLOSCAN_SIMULATION_VALIDATION.md` for the recorded container,
-hardware, command, verified outputs, and explicit validation boundary.
+hardware, commands, verified synthetic and real-model outputs, and explicit
+validation boundaries. The shipped ONNX files were checked against the source
+TorchScript files; see `docs/MODEL_EXPORT_EQUIVALENCE.md`.
 
 On Windows, an activated virtual environment provides `python.exe`, not
 necessarily `python3.exe`. Therefore `python3` can resolve to the Microsoft
@@ -72,6 +88,7 @@ on separate output ports. It intentionally keeps acquisition, inference, and
 display as separate operators so bounded queues, recorders, network transmitters,
 or Holoviz can replace individual stages without changing model semantics.
 
-This is a reference graph whose Python source is syntax-checked in CI. Successful
-execution and latency, power, thermal, and throughput results require validation
-on the target Linux/Jetson device and are not asserted by this repository.
+The bus ONNX predictor and deterministic simulation inputs have been executed
+in the official Holoscan 3.11 dGPU container. Camera acquisition, MediaPipe,
+Jetson deployment, latency, power, thermal, and throughput still require
+target-device validation and are not asserted by this repository.

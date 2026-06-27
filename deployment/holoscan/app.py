@@ -194,14 +194,18 @@ class CyclistPredictionOp(Operator):
         if self.runtime_args.model == "synthetic":
             self.predictor = SyntheticPredictor(self.runtime_args.fps)
         else:
-            import torch
-            torch.set_num_threads(self.runtime_args.torch_threads)
-            try:
-                torch.set_num_interop_threads(1)
-            except RuntimeError:
-                pass
-            from unified_prediction.predictors import create_predictor
-            self.predictor = create_predictor(self.runtime_args)
+            if self.runtime_args.runtime == "onnx":
+                from deployment.holoscan.onnx_worker import OnnxInferenceProcess
+                self.predictor = OnnxInferenceProcess(self.runtime_args)
+            else:
+                import torch
+                torch.set_num_threads(self.runtime_args.torch_threads)
+                try:
+                    torch.set_num_interop_threads(1)
+                except RuntimeError:
+                    pass
+                from unified_prediction.predictors import create_predictor
+                self.predictor = create_predictor(self.runtime_args)
         self.frame_index = 0
 
     def compute(self, op_input, op_output, context):
@@ -237,6 +241,8 @@ class CyclistPredictionOp(Operator):
     def stop(self):
         if self.pose is not None:
             self.pose.close()
+        if self.predictor is not None and hasattr(self.predictor, "close"):
+            self.predictor.close()
 
 
 class OutputOp(Operator):
@@ -326,6 +332,9 @@ def runtime_args(cli):
         duration=cli.duration, headless=cli.headless,
         output_jsonl=cli.output_jsonl,
         torch_threads=cli.torch_threads,
+        runtime=cli.runtime, onnx_model_dir=cli.onnx_model_dir,
+        onnx_provider=cli.onnx_provider, onnx_threads=cli.onnx_threads,
+        onnx_worker_timeout=cli.onnx_worker_timeout,
         bus_swap_upper_labels=False, intersection_fold=5,
         bus_config=None, bus_head_model=None, bus_upper_model=None,
         bus_leg_model=None, bus_stage2_model=None,
@@ -352,9 +361,24 @@ def main():
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--output-jsonl", type=Path)
     parser.add_argument("--torch-threads", type=int, default=1)
+    parser.add_argument("--runtime", choices=("torch", "onnx"), default="onnx")
+    parser.add_argument(
+        "--onnx-model-dir",
+        type=Path,
+        default=Path(ROOT) / "model_package" / "onnx",
+    )
+    parser.add_argument("--onnx-provider", default="CPUExecutionProvider")
+    parser.add_argument("--onnx-threads", type=int, default=1)
+    parser.add_argument("--onnx-worker-timeout", type=float, default=120.0)
     cli = parser.parse_args()
     if cli.torch_threads < 1:
         parser.error("--torch-threads must be at least 1")
+    if cli.onnx_threads < 1:
+        parser.error("--onnx-threads must be at least 1")
+    if cli.onnx_worker_timeout <= 0:
+        parser.error("--onnx-worker-timeout must be greater than zero")
+    if cli.runtime == "onnx" and cli.model not in ("bus", "synthetic"):
+        parser.error("--runtime onnx supports --model bus (or the synthetic fixture)")
     if cli.pose is None:
         cli.pose = "synthetic" if cli.camera == "synthetic" else "mediapipe"
     if cli.camera == "synthetic" and cli.duration <= 0:
