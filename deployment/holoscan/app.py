@@ -46,16 +46,16 @@ class CameraOp(Operator):
     def __init__(
         self,
         fragment,
-        *,
-        index=0,
+        *args,
+        source=0,
         width=640,
         height=480,
         fps=30,
         duration=0.0,
         **kwargs,
     ):
-        super().__init__(fragment, **kwargs)
-        self.index, self.width, self.height, self.fps = index, width, height, fps
+        super().__init__(fragment, *args, **kwargs)
+        self.source, self.width, self.height, self.fps = source, width, height, fps
         self.duration = duration
         self.capture = None
         self.started_at = None
@@ -65,12 +65,12 @@ class CameraOp(Operator):
 
     def start(self):
         self.started_at = time.monotonic()
-        self.capture = cv2.VideoCapture(self.index)
+        self.capture = cv2.VideoCapture(self.source)
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         self.capture.set(cv2.CAP_PROP_FPS, self.fps)
         if not self.capture.isOpened():
-            raise RuntimeError(f"Unable to open webcam index {self.index}")
+            raise RuntimeError(f"Unable to open camera source {self.source!r}")
 
     def compute(self, op_input, op_output, context):
         if self.duration > 0 and time.monotonic() - self.started_at >= self.duration:
@@ -304,14 +304,33 @@ class CyclistPredictionApplication(Application):
                 duration=self.runtime_args.duration,
             )
         else:
+            camera_source = (
+                self.runtime_args.camera_url
+                if self.runtime_args.camera == "stream"
+                else self.runtime_args.webcam_index
+            )
+            camera_conditions = []
+            if self.runtime_args.duration > 0:
+                camera_conditions.append(
+                    CountCondition(
+                        self,
+                        max(
+                            1,
+                            int(round(
+                                self.runtime_args.duration * self.runtime_args.fps
+                            )),
+                        ),
+                    )
+                )
             source = CameraOp(
                 self,
+                *camera_conditions,
                 name="camera",
-                index=self.runtime_args.webcam_index,
+                source=camera_source,
                 width=self.runtime_args.width,
                 height=self.runtime_args.height,
                 fps=self.runtime_args.fps,
-                duration=self.runtime_args.duration,
+                duration=0.0 if camera_conditions else self.runtime_args.duration,
             )
         inference = CyclistPredictionOp(self, name="cyclist_inference", args=self.runtime_args)
         display = OutputOp(
@@ -328,6 +347,7 @@ class CyclistPredictionApplication(Application):
 def runtime_args(cli):
     return SimpleNamespace(
         model=cli.model, pose=cli.pose, camera=cli.camera, webcam_index=cli.webcam_index,
+        camera_url=cli.camera_url,
         width=cli.width, height=cli.height, fps=cli.fps, device=cli.device,
         duration=cli.duration, headless=cli.headless,
         output_jsonl=cli.output_jsonl,
@@ -350,7 +370,12 @@ def main():
         choices=("bus", "intersection", "synthetic"),
         default="bus",
     )
-    parser.add_argument("--camera", choices=("webcam", "synthetic"), default="webcam")
+    parser.add_argument(
+        "--camera",
+        choices=("webcam", "stream", "synthetic"),
+        default="webcam",
+    )
+    parser.add_argument("--camera-url")
     parser.add_argument("--pose", choices=("mediapipe", "trt", "synthetic"))
     parser.add_argument("--webcam-index", type=int, default=0)
     parser.add_argument("--width", type=int, default=640)
@@ -379,6 +404,8 @@ def main():
         parser.error("--onnx-worker-timeout must be greater than zero")
     if cli.runtime == "onnx" and cli.model not in ("bus", "synthetic"):
         parser.error("--runtime onnx supports --model bus (or the synthetic fixture)")
+    if cli.camera == "stream" and not cli.camera_url:
+        parser.error("--camera-url is required with --camera stream")
     if cli.pose is None:
         cli.pose = "synthetic" if cli.camera == "synthetic" else "mediapipe"
     if cli.camera == "synthetic" and cli.duration <= 0:

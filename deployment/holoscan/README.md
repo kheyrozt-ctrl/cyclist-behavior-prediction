@@ -33,6 +33,43 @@ timeout (default: 120 seconds). ONNX is the default bus runtime and
 `model_package/onnx` is the default model directory; the flags are shown
 explicitly above for reproducibility.
 
+## Docker Desktop webcam bridge
+
+Docker Desktop on Windows does not expose a Windows webcam as `/dev/video0`
+inside its Linux VM. Run the local bridge from PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe deployment\holoscan\camera_bridge.py `
+  --webcam-index 0 --width 640 --height 480 --fps 30
+```
+
+The bridge binds to `127.0.0.1`, serves only an in-memory MJPEG stream, and does
+not record frames. Docker Desktop makes it available to a container at
+`host.docker.internal`.
+
+For a headless official Holoscan container, MediaPipe installs a GUI OpenCV
+wheel that needs `libGL.so.1`. Replace it with the headless wheel before
+starting the graph:
+
+```bash
+python3 -m pip install "numpy<2" "mediapipe==0.10.21" \
+  "onnxruntime>=1.27,<2"
+python3 -m pip uninstall -y opencv-python opencv-contrib-python
+python3 -m pip install "opencv-contrib-python-headless<4.12"
+
+python3 deployment/holoscan/app.py \
+  --model bus \
+  --runtime onnx \
+  --camera stream \
+  --camera-url http://host.docker.internal:8890/stream.mjpg \
+  --pose mediapipe \
+  --headless
+```
+
+For a non-headless Linux installation, use
+`deployment/holoscan/requirements.txt` and provide the normal OpenCV GUI system
+libraries.
+
 ## Headless simulation
 
 Use the official CUDA 12 dGPU container on an Ubuntu workstation or cloud GPU:
@@ -88,7 +125,8 @@ on separate output ports. It intentionally keeps acquisition, inference, and
 display as separate operators so bounded queues, recorders, network transmitters,
 or Holoviz can replace individual stages without changing model semantics.
 
-The bus ONNX predictor and deterministic simulation inputs have been executed
-in the official Holoscan 3.11 dGPU container. Camera acquisition, MediaPipe,
-Jetson deployment, latency, power, thermal, and throughput still require
-target-device validation and are not asserted by this repository.
+The bus ONNX predictor has been executed with both deterministic poses and a
+Windows webcam/MediaPipe stream in the official Holoscan 3.11 dGPU container.
+Direct V4L2 camera acquisition, Jetson deployment, latency, power, thermal, and
+throughput still require target-device validation and are not asserted by this
+repository.

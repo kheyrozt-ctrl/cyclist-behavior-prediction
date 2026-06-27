@@ -156,6 +156,8 @@ prediction publication into operators:
 The NVIDIA Holoscan runtime must be run on a supported Linux x86_64/CUDA or
 Jetson environment; it is not available as a native Windows Python runtime.
 On Windows, use `.\.venv\Scripts\python.exe unified_prediction\run_web.py`.
+Docker Desktop users can pass a Windows webcam through the local MJPEG bridge
+documented in [`deployment/holoscan/README.md`](deployment/holoscan/README.md).
 
 ```bash
 python3 -m pip install -r deployment/holoscan/requirements.txt

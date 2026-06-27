@@ -75,14 +75,53 @@ Verified results:
 These labels and confidence values come from deterministic synthetic poses and
 are integration fixtures, not accuracy measurements.
 
+## Live camera and MediaPipe validation
+
+Docker Desktop did not expose the Windows camera as `/dev/video0`. A local
+host-only MJPEG bridge supplied frames through
+`http://host.docker.internal:8890/stream.mjpg`. No video or image frames were
+recorded by the validation.
+
+```bash
+python3 deployment/holoscan/app.py \
+  --model bus \
+  --runtime onnx \
+  --camera stream \
+  --camera-url http://host.docker.internal:8890/stream.mjpg \
+  --pose mediapipe \
+  --duration 15 \
+  --fps 30 \
+  --headless \
+  --output-jsonl release/holoscan-live-camera.jsonl
+```
+
+The configured duration corresponds to 450 requested input frames. It is not a
+wall-clock performance measurement.
+
+- process exit code: `0`
+- structured JSONL records: `450`, continuous frame range `0..449`
+- pose status: `450/450` records reported `pose_ok=true`
+- first Stage1 prediction: frame `20`
+- Stage2 feature buffer reached `120/120`
+- first Stage2 prediction: frame `184`
+- observed timestamp span: `39.677 s` (`11.32` processed frames/s)
+- scheduler and isolated ONNX worker exited normally
+- no traceback, segmentation fault, timeout, or camera read failure
+
+The observed prediction was an uncontrolled webcam integration output. It is
+not a ground-truth label or an accuracy result. The processed frame rate is
+reported for transparency and is not presented as a latency or throughput
+benchmark.
+
 ## Boundary
 
-The runs validate the synthetic source and pose adapter, packaged bus ONNX
-models, process-isolated inference bridge, operator connections, fixed-count
-scheduling, headless sink, and JSONL serialization. They do not validate camera
-acquisition, MediaPipe, trt_pose, direct PyTorch inference inside a GXF worker,
-prediction accuracy, real-time latency, power, thermal behavior, or Jetson
-deployment.
+The runs validate the synthetic source and pose adapter, a Windows webcam
+transported through the local bridge, MediaPipe pose extraction, packaged bus
+ONNX models, process-isolated inference bridge, operator connections,
+fixed-count scheduling, headless sink, and JSONL serialization. They do not
+validate direct V4L2 camera acquisition, trt_pose, direct PyTorch inference
+inside a GXF worker, prediction accuracy, real-time latency, power, thermal
+behavior, or Jetson deployment.
 
 Direct PyTorch and ONNX Runtime calls from the GXF Python worker both produced
 a native Python thread-state crash at the first Stage1 inference. The validated
