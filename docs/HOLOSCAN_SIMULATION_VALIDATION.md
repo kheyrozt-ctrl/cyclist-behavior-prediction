@@ -113,6 +113,9 @@ not a ground-truth label or an accuracy result. The processed frame rate is
 reported for transparency and is not presented as a latency or throughput
 benchmark.
 
+Subsequent per-stage timing and MediaPipe complexity comparisons are recorded
+in `docs/HOLOSCAN_PERFORMANCE_VALIDATION.md`.
+
 ## Boundary
 
 The runs validate the synthetic source and pose adapter, a Windows webcam

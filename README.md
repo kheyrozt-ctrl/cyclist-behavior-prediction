@@ -178,6 +178,8 @@ official Holoscan 3.11 container. See
 for the verified outputs and limitations, and
 [`docs/MODEL_EXPORT_EQUIVALENCE.md`](docs/MODEL_EXPORT_EQUIVALENCE.md) for the
 TorchScript-to-ONNX numerical-equivalence audit.
+Desktop timing and the remaining target-device gates are reported in
+[`docs/HOLOSCAN_PERFORMANCE_VALIDATION.md`](docs/HOLOSCAN_PERFORMANCE_VALIDATION.md).
 
 The third-party trt_pose ResNet18 checkpoint is not stored in Git. Install it
 from the upstream NVIDIA release with `bash pose_detection/download_models.sh`.

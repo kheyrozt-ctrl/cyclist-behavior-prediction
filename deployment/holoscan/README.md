@@ -70,6 +70,33 @@ For a non-headless Linux installation, use
 `deployment/holoscan/requirements.txt` and provide the normal OpenCV GUI system
 libraries.
 
+The reproducible container packages those headless dependencies:
+
+```powershell
+docker build -t cyclist-holoscan:3.11 `
+  -f deployment/holoscan/Dockerfile deployment/holoscan
+```
+
+For a complete 450-frame Windows camera validation, double-click
+`validate_live_camera.bat` or run:
+
+```powershell
+deployment\holoscan\validate_live_camera.ps1
+```
+
+The script builds the image if needed, starts and stops the camera bridge,
+runs the real MediaPipe/ONNX graph, and writes a JSON timing summary under
+`release/`. It does not save camera images or video.
+
+On a supported Linux/Jetson system with `/dev/video0`, run:
+
+```bash
+bash deployment/holoscan/validate_v4l2.sh 0 450 30
+```
+
+That command is an acceptance-test entry point, not evidence that this
+repository has executed on Jetson hardware.
+
 ## Headless simulation
 
 Use the official CUDA 12 dGPU container on an Ubuntu workstation or cloud GPU:
@@ -107,10 +134,19 @@ latency, power, thermal, or production-hardware evidence.
 `--torch-threads` applies only to the direct PyTorch runtime. The validated bus
 path is `--runtime onnx`.
 
+MediaPipe complexity defaults to `1`. Use `--mediapipe-complexity 0|1|2` to
+change it. Complexity 0 was faster but failed the pose-coverage gate in the
+recorded webcam test; complexity 2 was substantially slower. Headless mode
+skips skeleton and text rendering because the sink discards annotated pixels.
+Every JSONL record includes separate pose, predictor, operator, and
+source-to-graph timing fields.
+
 See `docs/HOLOSCAN_SIMULATION_VALIDATION.md` for the recorded container,
 hardware, commands, verified synthetic and real-model outputs, and explicit
 validation boundaries. The shipped ONNX files were checked against the source
 TorchScript files; see `docs/MODEL_EXPORT_EQUIVALENCE.md`.
+Measured desktop timing and its limitations are documented in
+`docs/HOLOSCAN_PERFORMANCE_VALIDATION.md`.
 
 On Windows, an activated virtual environment provides `python.exe`, not
 necessarily `python3.exe`. Therefore `python3` can resolve to the Microsoft

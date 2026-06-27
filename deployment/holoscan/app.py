@@ -190,7 +190,19 @@ class CyclistPredictionOp(Operator):
             self.pose = SyntheticPoseAdapter(self.runtime_args.fps)
         else:
             from cyclist_inference.pose_adapter import create_pose_adapter
-            self.pose = create_pose_adapter(self.runtime_args.pose)
+            pose_options = {}
+            if self.runtime_args.pose == "mediapipe":
+                pose_options = {
+                    "model_complexity": self.runtime_args.mediapipe_complexity,
+                    "min_detection_confidence": (
+                        self.runtime_args.mediapipe_detection_confidence
+                    ),
+                    "min_tracking_confidence": (
+                        self.runtime_args.mediapipe_tracking_confidence
+                    ),
+                    "input_width": self.runtime_args.mediapipe_input_width or None,
+                }
+            self.pose = create_pose_adapter(self.runtime_args.pose, **pose_options)
         if self.runtime_args.model == "synthetic":
             self.predictor = SyntheticPredictor(self.runtime_args.fps)
         else:
@@ -210,6 +222,7 @@ class CyclistPredictionOp(Operator):
 
     def compute(self, op_input, op_output, context):
         from unified_prediction.runtime import draw_overlay
+        operator_started = time.perf_counter()
         packet = op_input.receive("frame")
         if isinstance(packet, dict):
             frame = packet["frame"]
@@ -217,14 +230,25 @@ class CyclistPredictionOp(Operator):
         else:
             frame = packet
             now = time.time()
+        pose_started = time.perf_counter()
         self.pose.process(frame)
         keypoints = self.pose.extract_keypoints()
+        pose_finished = time.perf_counter()
         if keypoints is not None:
             self.predictor.update(keypoints, now)
-        self.pose.draw_skeleton(frame)
+        predictor_finished = time.perf_counter()
         lines = self.predictor.overlay_lines()
-        draw_overlay(frame, self.predictor.title, 0.0, keypoints is not None,
-                     lines, self.predictor.progress())
+        if not self.runtime_args.headless:
+            self.pose.draw_skeleton(frame)
+            draw_overlay(
+                frame,
+                self.predictor.title,
+                0.0,
+                keypoints is not None,
+                lines,
+                self.predictor.progress(),
+            )
+        operator_finished = time.perf_counter()
         op_output.emit(frame, "annotated")
         op_output.emit(
             {
@@ -233,6 +257,21 @@ class CyclistPredictionOp(Operator):
                 "pose_ok": keypoints is not None,
                 "progress": self.predictor.progress(),
                 "lines": [text for text, _ in lines],
+                "timing_ms": {
+                    "pose": round((pose_finished - pose_started) * 1000, 3),
+                    "predictor": round(
+                        (predictor_finished - pose_finished) * 1000,
+                        3,
+                    ),
+                    "operator": round(
+                        (operator_finished - operator_started) * 1000,
+                        3,
+                    ),
+                    "graph_since_source": round(
+                        max(0.0, time.time() - now) * 1000,
+                        3,
+                    ),
+                },
             },
             "prediction",
         )
@@ -355,6 +394,10 @@ def runtime_args(cli):
         runtime=cli.runtime, onnx_model_dir=cli.onnx_model_dir,
         onnx_provider=cli.onnx_provider, onnx_threads=cli.onnx_threads,
         onnx_worker_timeout=cli.onnx_worker_timeout,
+        mediapipe_complexity=cli.mediapipe_complexity,
+        mediapipe_detection_confidence=cli.mediapipe_detection_confidence,
+        mediapipe_tracking_confidence=cli.mediapipe_tracking_confidence,
+        mediapipe_input_width=cli.mediapipe_input_width,
         bus_swap_upper_labels=False, intersection_fold=5,
         bus_config=None, bus_head_model=None, bus_upper_model=None,
         bus_leg_model=None, bus_stage2_model=None,
@@ -395,6 +438,28 @@ def main():
     parser.add_argument("--onnx-provider", default="CPUExecutionProvider")
     parser.add_argument("--onnx-threads", type=int, default=1)
     parser.add_argument("--onnx-worker-timeout", type=float, default=120.0)
+    parser.add_argument(
+        "--mediapipe-complexity",
+        type=int,
+        choices=(0, 1, 2),
+        default=1,
+    )
+    parser.add_argument(
+        "--mediapipe-detection-confidence",
+        type=float,
+        default=0.8,
+    )
+    parser.add_argument(
+        "--mediapipe-tracking-confidence",
+        type=float,
+        default=0.5,
+    )
+    parser.add_argument(
+        "--mediapipe-input-width",
+        type=int,
+        default=0,
+        help="Resize only the MediaPipe inference input; 0 keeps source size.",
+    )
     cli = parser.parse_args()
     if cli.torch_threads < 1:
         parser.error("--torch-threads must be at least 1")
@@ -402,6 +467,14 @@ def main():
         parser.error("--onnx-threads must be at least 1")
     if cli.onnx_worker_timeout <= 0:
         parser.error("--onnx-worker-timeout must be greater than zero")
+    for flag, value in (
+        ("--mediapipe-detection-confidence", cli.mediapipe_detection_confidence),
+        ("--mediapipe-tracking-confidence", cli.mediapipe_tracking_confidence),
+    ):
+        if not 0.0 <= value <= 1.0:
+            parser.error(f"{flag} must be between 0 and 1")
+    if cli.mediapipe_input_width != 0 and cli.mediapipe_input_width < 128:
+        parser.error("--mediapipe-input-width must be 0 or at least 128")
     if cli.runtime == "onnx" and cli.model not in ("bus", "synthetic"):
         parser.error("--runtime onnx supports --model bus (or the synthetic fixture)")
     if cli.camera == "stream" and not cli.camera_url:

@@ -33,7 +33,13 @@ class PoseAdapter(ABC):
 class MediaPipeAdapter(PoseAdapter):
     """Wraps MediaPipe BlazePose (33 keypoints)."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        model_complexity=2,
+        min_detection_confidence=0.8,
+        min_tracking_confidence=0.5,
+        input_width=None,
+    ):
         import mediapipe as mp
         if not hasattr(mp, "solutions"):
             raise RuntimeError(
@@ -44,17 +50,28 @@ class MediaPipeAdapter(PoseAdapter):
         self._mp = mp
         self._mp_pose = mp.solutions.pose
         self._mp_drawing = mp.solutions.drawing_utils
+        self._input_width = input_width
         self._pose = self._mp_pose.Pose(
             static_image_mode=False,
-            model_complexity=2,
-            min_detection_confidence=0.8,
-            min_tracking_confidence=0.5,
+            model_complexity=model_complexity,
+            min_detection_confidence=min_detection_confidence,
+            min_tracking_confidence=min_tracking_confidence,
         )
         self._results = None
 
     def process(self, bgr_frame) -> None:
         import cv2
-        rgb = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
+        inference_frame = bgr_frame
+        if self._input_width and bgr_frame.shape[1] > self._input_width:
+            height = int(round(
+                bgr_frame.shape[0] * self._input_width / bgr_frame.shape[1]
+            ))
+            inference_frame = cv2.resize(
+                bgr_frame,
+                (self._input_width, height),
+                interpolation=cv2.INTER_AREA,
+            )
+        rgb = cv2.cvtColor(inference_frame, cv2.COLOR_BGR2RGB)
         self._results = self._pose.process(rgb)
 
     def extract_keypoints(self) -> Optional[List[float]]:
@@ -240,7 +257,7 @@ class TrtPoseAdapter(PoseAdapter):
         return keypoints
 
 
-def create_pose_adapter(backend: str) -> PoseAdapter:
+def create_pose_adapter(backend: str, **kwargs) -> PoseAdapter:
     """Factory function to create a pose estimation adapter.
 
     Args:
@@ -250,7 +267,7 @@ def create_pose_adapter(backend: str) -> PoseAdapter:
         PoseAdapter instance
     """
     if backend == "mediapipe":
-        return MediaPipeAdapter()
+        return MediaPipeAdapter(**kwargs)
     elif backend == "trt":
         return TrtPoseAdapter()
     else:
