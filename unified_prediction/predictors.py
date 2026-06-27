@@ -32,6 +32,14 @@ def softmax_label(logits, labels):
     return labels[idx], float(probs[0, idx].item()), idx
 
 
+def numpy_softmax_label(logits, labels):
+    shifted = logits - np.max(logits, axis=1, keepdims=True)
+    probabilities = np.exp(shifted)
+    probabilities /= np.sum(probabilities, axis=1, keepdims=True)
+    idx = int(np.argmax(probabilities, axis=1)[0])
+    return labels[idx], float(probabilities[0, idx]), idx
+
+
 def format_prediction(prefix, pred):
     if pred is None:
         return f"{prefix}: collecting..."
@@ -196,6 +204,105 @@ class BusStopPredictor:
         return len(self.feature_buffer), self.STAGE2_SEQ_LEN
 
 
+class OnnxBusStopPredictor(BusStopPredictor):
+    """Bus-stop predictor using ONNX Runtime instead of Python PyTorch."""
+
+    def __init__(self, args):
+        import onnxruntime as ort
+
+        package_dir = os.path.join(ROOT_DIR, "model_package")
+        config_path = args.bus_config or os.path.join(package_dir, "model_config.json")
+        require_file(config_path, "Bus config")
+        with open(config_path, "r", encoding="utf-8") as handle:
+            config = json.load(handle)
+        self.labels = {
+            "head": config["stage1"]["head"]["classes"],
+            "upper_limb": config["stage1"]["upper_limb"]["classes"],
+            "leg": config["stage1"]["leg"]["classes"],
+            "stage2": config["stage2"]["classes"],
+        }
+        if args.bus_swap_upper_labels:
+            self.labels["upper_limb"] = self.labels["upper_limb"].copy()
+            self.labels["upper_limb"][0], self.labels["upper_limb"][1] = (
+                self.labels["upper_limb"][1],
+                self.labels["upper_limb"][0],
+            )
+
+        model_dir = getattr(args, "onnx_model_dir", None)
+        if model_dir is None:
+            raise ValueError("--onnx-model-dir is required with --runtime onnx")
+        model_dir = os.fspath(model_dir)
+        paths = {
+            "head": os.path.join(model_dir, "head.onnx"),
+            "upper": os.path.join(model_dir, "upper.onnx"),
+            "leg": os.path.join(model_dir, "leg.onnx"),
+            "stage2": os.path.join(model_dir, "stage2.onnx"),
+        }
+        for key, path in paths.items():
+            require_file(path, f"{key} ONNX model")
+
+        provider = getattr(args, "onnx_provider", "CPUExecutionProvider")
+        available = ort.get_available_providers()
+        if provider not in available:
+            raise RuntimeError(
+                f"ONNX provider {provider!r} is unavailable; available={available}"
+            )
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = max(1, int(getattr(args, "onnx_threads", 1)))
+        options.inter_op_num_threads = 1
+        options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+        self.sessions = {
+            key: ort.InferenceSession(
+                path,
+                sess_options=options,
+                providers=[provider],
+            )
+            for key, path in paths.items()
+        }
+        self.buffers = {
+            "head": collections.deque(maxlen=self.HEAD_WINDOW),
+            "upper": collections.deque(maxlen=self.UPPER_WINDOW),
+            "leg": collections.deque(maxlen=self.LEG_WINDOW),
+        }
+        self.feature_buffer = collections.deque(maxlen=self.STAGE2_SEQ_LEN)
+        self.stage1_sampler = RateSampler(self.STAGE1_FPS)
+        self.leg_sampler = RateSampler(self.LEG_FPS)
+        self.stage1_pred = {}
+        self.stage2_pred = None
+        print(f"Loaded bus-stop ONNX models with {provider}")
+
+    def _run_stage1(self):
+        inputs = {
+            "head": np.asarray(self.buffers["head"], dtype=np.float32)[None, ...],
+            "upper": np.asarray(self.buffers["upper"], dtype=np.float32)[None, ...],
+            "leg": np.asarray(self.buffers["leg"], dtype=np.float32)[None, ...],
+        }
+        outputs = {
+            key: self.sessions[key].run(None, {"input": values})
+            for key, values in inputs.items()
+        }
+        feature = np.concatenate(
+            [outputs["head"][1], outputs["upper"][1], outputs["leg"][1]],
+            axis=1,
+        )
+        if feature.shape != (1, 640):
+            raise RuntimeError(f"Stage1 feature shape should be (1, 640), got {feature.shape}")
+        predictions = {
+            "head": numpy_softmax_label(outputs["head"][0], self.labels["head"]),
+            "upper": numpy_softmax_label(
+                outputs["upper"][0],
+                self.labels["upper_limb"],
+            ),
+            "leg": numpy_softmax_label(outputs["leg"][0], self.labels["leg"]),
+        }
+        return feature[0], predictions
+
+    def _run_stage2(self):
+        sequence = np.asarray(self.feature_buffer, dtype=np.float32)[None, ...]
+        logits = self.sessions["stage2"].run(None, {"input": sequence})[0]
+        return numpy_softmax_label(logits, self.labels["stage2"])
+
+
 class IntersectionPredictor:
     title = "Intersection model: Crossing / LeftTurn / RightTurn"
 
@@ -330,6 +437,8 @@ class IntersectionPredictor:
 
 def create_predictor(args):
     if args.model == "bus":
+        if getattr(args, "runtime", "torch") == "onnx":
+            return OnnxBusStopPredictor(args)
         return BusStopPredictor(args)
     if args.model == "intersection":
         return IntersectionPredictor(args)

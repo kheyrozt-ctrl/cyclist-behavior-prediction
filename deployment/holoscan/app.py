@@ -46,16 +46,16 @@ class CameraOp(Operator):
     def __init__(
         self,
         fragment,
-        *,
-        index=0,
+        *args,
+        source=0,
         width=640,
         height=480,
         fps=30,
         duration=0.0,
         **kwargs,
     ):
-        super().__init__(fragment, **kwargs)
-        self.index, self.width, self.height, self.fps = index, width, height, fps
+        super().__init__(fragment, *args, **kwargs)
+        self.source, self.width, self.height, self.fps = source, width, height, fps
         self.duration = duration
         self.capture = None
         self.started_at = None
@@ -65,12 +65,12 @@ class CameraOp(Operator):
 
     def start(self):
         self.started_at = time.monotonic()
-        self.capture = cv2.VideoCapture(self.index)
+        self.capture = cv2.VideoCapture(self.source)
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         self.capture.set(cv2.CAP_PROP_FPS, self.fps)
         if not self.capture.isOpened():
-            raise RuntimeError(f"Unable to open webcam index {self.index}")
+            raise RuntimeError(f"Unable to open camera source {self.source!r}")
 
     def compute(self, op_input, op_output, context):
         if self.duration > 0 and time.monotonic() - self.started_at >= self.duration:
@@ -190,22 +190,39 @@ class CyclistPredictionOp(Operator):
             self.pose = SyntheticPoseAdapter(self.runtime_args.fps)
         else:
             from cyclist_inference.pose_adapter import create_pose_adapter
-            self.pose = create_pose_adapter(self.runtime_args.pose)
+            pose_options = {}
+            if self.runtime_args.pose == "mediapipe":
+                pose_options = {
+                    "model_complexity": self.runtime_args.mediapipe_complexity,
+                    "min_detection_confidence": (
+                        self.runtime_args.mediapipe_detection_confidence
+                    ),
+                    "min_tracking_confidence": (
+                        self.runtime_args.mediapipe_tracking_confidence
+                    ),
+                    "input_width": self.runtime_args.mediapipe_input_width or None,
+                }
+            self.pose = create_pose_adapter(self.runtime_args.pose, **pose_options)
         if self.runtime_args.model == "synthetic":
             self.predictor = SyntheticPredictor(self.runtime_args.fps)
         else:
-            import torch
-            torch.set_num_threads(self.runtime_args.torch_threads)
-            try:
-                torch.set_num_interop_threads(1)
-            except RuntimeError:
-                pass
-            from unified_prediction.predictors import create_predictor
-            self.predictor = create_predictor(self.runtime_args)
+            if self.runtime_args.runtime == "onnx":
+                from deployment.holoscan.onnx_worker import OnnxInferenceProcess
+                self.predictor = OnnxInferenceProcess(self.runtime_args)
+            else:
+                import torch
+                torch.set_num_threads(self.runtime_args.torch_threads)
+                try:
+                    torch.set_num_interop_threads(1)
+                except RuntimeError:
+                    pass
+                from unified_prediction.predictors import create_predictor
+                self.predictor = create_predictor(self.runtime_args)
         self.frame_index = 0
 
     def compute(self, op_input, op_output, context):
         from unified_prediction.runtime import draw_overlay
+        operator_started = time.perf_counter()
         packet = op_input.receive("frame")
         if isinstance(packet, dict):
             frame = packet["frame"]
@@ -213,14 +230,25 @@ class CyclistPredictionOp(Operator):
         else:
             frame = packet
             now = time.time()
+        pose_started = time.perf_counter()
         self.pose.process(frame)
         keypoints = self.pose.extract_keypoints()
+        pose_finished = time.perf_counter()
         if keypoints is not None:
             self.predictor.update(keypoints, now)
-        self.pose.draw_skeleton(frame)
+        predictor_finished = time.perf_counter()
         lines = self.predictor.overlay_lines()
-        draw_overlay(frame, self.predictor.title, 0.0, keypoints is not None,
-                     lines, self.predictor.progress())
+        if not self.runtime_args.headless:
+            self.pose.draw_skeleton(frame)
+            draw_overlay(
+                frame,
+                self.predictor.title,
+                0.0,
+                keypoints is not None,
+                lines,
+                self.predictor.progress(),
+            )
+        operator_finished = time.perf_counter()
         op_output.emit(frame, "annotated")
         op_output.emit(
             {
@@ -229,6 +257,21 @@ class CyclistPredictionOp(Operator):
                 "pose_ok": keypoints is not None,
                 "progress": self.predictor.progress(),
                 "lines": [text for text, _ in lines],
+                "timing_ms": {
+                    "pose": round((pose_finished - pose_started) * 1000, 3),
+                    "predictor": round(
+                        (predictor_finished - pose_finished) * 1000,
+                        3,
+                    ),
+                    "operator": round(
+                        (operator_finished - operator_started) * 1000,
+                        3,
+                    ),
+                    "graph_since_source": round(
+                        max(0.0, time.time() - now) * 1000,
+                        3,
+                    ),
+                },
             },
             "prediction",
         )
@@ -237,6 +280,8 @@ class CyclistPredictionOp(Operator):
     def stop(self):
         if self.pose is not None:
             self.pose.close()
+        if self.predictor is not None and hasattr(self.predictor, "close"):
+            self.predictor.close()
 
 
 class OutputOp(Operator):
@@ -298,14 +343,33 @@ class CyclistPredictionApplication(Application):
                 duration=self.runtime_args.duration,
             )
         else:
+            camera_source = (
+                self.runtime_args.camera_url
+                if self.runtime_args.camera == "stream"
+                else self.runtime_args.webcam_index
+            )
+            camera_conditions = []
+            if self.runtime_args.duration > 0:
+                camera_conditions.append(
+                    CountCondition(
+                        self,
+                        max(
+                            1,
+                            int(round(
+                                self.runtime_args.duration * self.runtime_args.fps
+                            )),
+                        ),
+                    )
+                )
             source = CameraOp(
                 self,
+                *camera_conditions,
                 name="camera",
-                index=self.runtime_args.webcam_index,
+                source=camera_source,
                 width=self.runtime_args.width,
                 height=self.runtime_args.height,
                 fps=self.runtime_args.fps,
-                duration=self.runtime_args.duration,
+                duration=0.0 if camera_conditions else self.runtime_args.duration,
             )
         inference = CyclistPredictionOp(self, name="cyclist_inference", args=self.runtime_args)
         display = OutputOp(
@@ -322,10 +386,18 @@ class CyclistPredictionApplication(Application):
 def runtime_args(cli):
     return SimpleNamespace(
         model=cli.model, pose=cli.pose, camera=cli.camera, webcam_index=cli.webcam_index,
+        camera_url=cli.camera_url,
         width=cli.width, height=cli.height, fps=cli.fps, device=cli.device,
         duration=cli.duration, headless=cli.headless,
         output_jsonl=cli.output_jsonl,
         torch_threads=cli.torch_threads,
+        runtime=cli.runtime, onnx_model_dir=cli.onnx_model_dir,
+        onnx_provider=cli.onnx_provider, onnx_threads=cli.onnx_threads,
+        onnx_worker_timeout=cli.onnx_worker_timeout,
+        mediapipe_complexity=cli.mediapipe_complexity,
+        mediapipe_detection_confidence=cli.mediapipe_detection_confidence,
+        mediapipe_tracking_confidence=cli.mediapipe_tracking_confidence,
+        mediapipe_input_width=cli.mediapipe_input_width,
         bus_swap_upper_labels=False, intersection_fold=5,
         bus_config=None, bus_head_model=None, bus_upper_model=None,
         bus_leg_model=None, bus_stage2_model=None,
@@ -341,7 +413,12 @@ def main():
         choices=("bus", "intersection", "synthetic"),
         default="bus",
     )
-    parser.add_argument("--camera", choices=("webcam", "synthetic"), default="webcam")
+    parser.add_argument(
+        "--camera",
+        choices=("webcam", "stream", "synthetic"),
+        default="webcam",
+    )
+    parser.add_argument("--camera-url")
     parser.add_argument("--pose", choices=("mediapipe", "trt", "synthetic"))
     parser.add_argument("--webcam-index", type=int, default=0)
     parser.add_argument("--width", type=int, default=640)
@@ -352,9 +429,56 @@ def main():
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--output-jsonl", type=Path)
     parser.add_argument("--torch-threads", type=int, default=1)
+    parser.add_argument("--runtime", choices=("torch", "onnx"), default="onnx")
+    parser.add_argument(
+        "--onnx-model-dir",
+        type=Path,
+        default=Path(ROOT) / "model_package" / "onnx",
+    )
+    parser.add_argument("--onnx-provider", default="CPUExecutionProvider")
+    parser.add_argument("--onnx-threads", type=int, default=1)
+    parser.add_argument("--onnx-worker-timeout", type=float, default=120.0)
+    parser.add_argument(
+        "--mediapipe-complexity",
+        type=int,
+        choices=(0, 1, 2),
+        default=1,
+    )
+    parser.add_argument(
+        "--mediapipe-detection-confidence",
+        type=float,
+        default=0.8,
+    )
+    parser.add_argument(
+        "--mediapipe-tracking-confidence",
+        type=float,
+        default=0.5,
+    )
+    parser.add_argument(
+        "--mediapipe-input-width",
+        type=int,
+        default=0,
+        help="Resize only the MediaPipe inference input; 0 keeps source size.",
+    )
     cli = parser.parse_args()
     if cli.torch_threads < 1:
         parser.error("--torch-threads must be at least 1")
+    if cli.onnx_threads < 1:
+        parser.error("--onnx-threads must be at least 1")
+    if cli.onnx_worker_timeout <= 0:
+        parser.error("--onnx-worker-timeout must be greater than zero")
+    for flag, value in (
+        ("--mediapipe-detection-confidence", cli.mediapipe_detection_confidence),
+        ("--mediapipe-tracking-confidence", cli.mediapipe_tracking_confidence),
+    ):
+        if not 0.0 <= value <= 1.0:
+            parser.error(f"{flag} must be between 0 and 1")
+    if cli.mediapipe_input_width != 0 and cli.mediapipe_input_width < 128:
+        parser.error("--mediapipe-input-width must be 0 or at least 128")
+    if cli.runtime == "onnx" and cli.model not in ("bus", "synthetic"):
+        parser.error("--runtime onnx supports --model bus (or the synthetic fixture)")
+    if cli.camera == "stream" and not cli.camera_url:
+        parser.error("--camera-url is required with --camera stream")
     if cli.pose is None:
         cli.pose = "synthetic" if cli.camera == "synthetic" else "mediapipe"
     if cli.camera == "synthetic" and cli.duration <= 0:
