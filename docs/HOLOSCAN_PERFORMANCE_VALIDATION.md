@@ -44,13 +44,31 @@ The 450-frame complexity-1 run completed with:
   p99 `45.36 ms`
 - no graph, camera, MediaPipe, or inference-worker failure
 
-The valid-pose run did not sustain 30 fps and does not meet a strict 30 fps
-acceptance gate.
+That run did not sustain 30 fps. Headless rendering was subsequently disabled
+because the sink discards the annotated pixels.
 
-Headless rendering was subsequently disabled because the sink discards the
-annotated pixels. A no-pose run then processed 35.86 fps with operator p95
-`20.99 ms`; because pose coverage was `0/450`, that result is only an
-unloaded-path ceiling and is not a replacement for the valid-pose result.
+## Optimized headless run
+
+The one-click validation script then completed a second 450-frame,
+complexity-1 run:
+
+- process exit code `0`
+- pose coverage `449/450` (`99.78%`)
+- processed rate `33.93 fps`
+- first Stage1 output at frame `43`
+- first Stage2 output at frame `412`
+- final Stage2 buffer `120/120`
+- pose timing: p50 `23.62 ms`, p95 `28.32 ms`, p99 `32.16 ms`
+- predictor timing: p50 `0.54 ms`, p95 `3.47 ms`, p99 `7.16 ms`
+- operator timing: p50 `25.11 ms`, p95 `31.03 ms`, p99 `33.91 ms`
+- source-to-graph timing: p50 `25.53 ms`, p95 `31.68 ms`,
+  p99 `34.57 ms`
+- no graph, camera, MediaPipe, or inference-worker failure
+
+The short-run average throughput exceeded 30 fps and the operator p95 stayed
+within the 33.33 ms frame period. Operator p99 was `33.91 ms`, so this does not
+establish that every frame meets a strict 30 fps deadline. It is also not a
+sustained soak or target-device result.
 
 ## Reproduction
 
@@ -74,7 +92,6 @@ python tools/summarize_holoscan_run.py release/holoscan-live-validation.jsonl
 
 ## Remaining acceptance work
 
-- repeat the optimized headless run with valid pose coverage;
 - run direct V4L2 acquisition on the target Linux/Jetson device;
 - measure power mode, clocks, temperature, memory, drops, and a sustained soak;
 - measure capture timestamps at the sensor boundary before making
