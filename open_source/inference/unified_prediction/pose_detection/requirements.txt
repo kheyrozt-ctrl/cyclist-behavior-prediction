@@ -1,0 +1,12 @@
+# Project-specific dependencies (installed inside the venv)
+numpy==1.24.4
+opencv-python
+Pillow
+gdown
+
+# The following are inherited from system-site-packages (do NOT pip install these):
+# torch==2.0.0+nv23.05    (NVIDIA Jetson wheel)
+# torchvision==0.15.1      (built from source)
+# trt_pose==0.0.1          (built from source with CUDA)
+# torch2trt==0.5.0         (built from source)
+# pyrealsense2==2.54.2     (built from source with FORCE_RSUSB_BACKEND)
