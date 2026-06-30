@@ -1,5 +1,0 @@
-explicit gesture classifiction
-epoch = 40
-
-implicit gesture classification
-epoch = 200

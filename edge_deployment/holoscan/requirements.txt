@@ -1,0 +1,7 @@
+# JetPack 5 uses Python 3.8/CUDA 11 and needs the last compatible official
+# manylinux2014 aarch64 wheel. Newer platforms use the current CUDA 12 SDK line.
+holoscan==0.6.0; sys_platform == "linux" and platform_machine == "aarch64" and python_version == "3.8"
+holoscan-cu12>=3.0,<5; sys_platform == "linux" and (platform_machine != "aarch64" or python_version != "3.8")
+filelock<4
+opencv-python>=4.8; platform_machine != "aarch64"
+numpy>=1.24,<2

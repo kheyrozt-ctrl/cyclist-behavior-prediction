@@ -1,180 +1,74 @@
-# Cyclist Behavior Prediction Workspace
+# Cyclist Behavior Prediction
 
-[![License](https://img.shields.io/badge/code-Apache--2.0-blue.svg)](LICENSE)
+Academic submission and open-source release repository for cyclist/VRU behavior
+prediction, public dataset preparation, and CAVE-to-cloud-to-edge deployment.
 
-This repository contains real-time cyclist behavior prediction pipelines for:
+## Main Deliverables
 
-- `unified_prediction/`: shared real-time app with one camera/pose/display loop and selectable predictors.
-- `cyclist_inference/`: intersection cyclist intention prediction.
-- `model_package/`: bus-stop cyclist behavior prediction using TorchScript models.
-- `pose_detection/`: RealSense/trt_pose pose detection utilities and model files.
-- `cyclistprediction/`: source training/inference code and lightweight trained weights needed by `cyclist_inference`.
+### Public anonymized VRU dataset
 
-Large raw/training datasets may be present in a local workspace, but remain
-excluded from Git. Virtual environments, generated videos, and old nested Git
-histories are also intentionally excluded from this flattened repository.
+Location: `public_dataset/`
 
-## Unified Launcher
+- Dataset release documentation and inventory.
+- Hugging Face dataset preparation scripts.
+- Privacy checking and public training notes.
 
-### Web launcher (recommended)
+### Open-source training/inference code
 
-Run the local web console with a parameter panel and live annotated preview:
+Location: `open_source/`
 
-```bash
-python3 unified_prediction/run_web.py
+- `training/`: model training and evaluation code.
+- `training/intersection_intention_legacy/`: original intersection gesture-to-maneuver training lineage.
+- `training/bus_stop_v5_public/`: V5 public-training and combined bus-stop model lineage.
+- `inference/intersection_runtime/`: original real-time intersection inference runtime.
+- `inference/unified_prediction/`: unified prediction runtime and web launcher.
+- `model_artifacts/bus_stop_torchscript/`: packaged bus-stop TorchScript artifacts.
+- `pose_backends/trt_pose/`: Jetson/TRT pose backend support.
+- `launchers/`: launcher scripts and dependency files.
+
+License: Apache-2.0, as declared by the repository `LICENSE`.
+
+### Holoscan edge graphs
+
+Location: `edge_deployment/`
+
+- Holoscan app, config, simulation, and validation notes.
+
+### CAVE-to-cloud-to-edge framework
+
+Location: `framework_blueprint/`
+
+- Framework blueprint and best-practice guide.
+
+## Start Prediction
+
+Prerequisite: install 64-bit Python 3.11 or 3.12 on desktop systems. Jetson
+systems may use JetPack's aarch64 Python 3.8 environment. Python 3.13 is not
+supported by the current NumPy/MediaPipe dependency set.
+
+Recommended Windows entrypoint:
+
+```powershell
+.\start_prediction.bat
 ```
 
-Or launch it by double-clicking the platform script in the repository root:
+Direct runtime entrypoint:
 
-- Windows: `start_unified_web.bat`
-- Linux: `start_unified_web.sh`
-
-On first launch, the script creates `.venv` and installs the packages from
-`requirements-unified.txt`. Later launches reuse that environment. Internet
-access is required only for the first setup. On Jetson, the Linux environment
-inherits system packages so it can reuse NVIDIA's PyTorch/CUDA installation.
-
-On Linux, mark the script as executable once after downloading:
-
-```bash
-chmod +x start_unified_web.sh
+```powershell
+cd open_source\inference\unified_prediction
+.\start_web.bat
 ```
 
-Some Linux file managers default to opening shell scripts as text. Select
-"Run as a program" when prompted, or enable executable text files in the file
-manager preferences.
+The unified runtime creates its own `.venv` in
+`open_source/inference/unified_prediction/` and installs
+`open_source/inference/unified_prediction/requirements.txt`.
 
-The browser opens at `http://127.0.0.1:8765`. To access it from another device
-on the same trusted network, use `--host 0.0.0.0` and open the machine's LAN IP.
+## Important Model Note
 
-The web console provides an English, single-screen traffic-prediction interface
-with model, pose, camera, resolution, frame-rate, fold, and compute-device
-controls. The right panel shows annotated camera frames, pose status, current
-prediction output, and sequence-buffer progress. See
-[`docs/UNIFIED_WEB_LAUNCHER.md`](docs/UNIFIED_WEB_LAUNCHER.md) for operation and
-troubleshooting details.
+The bus-stop unified runtime includes packaged TorchScript models. The
+intersection pipeline still requires explicit and implicit gesture checkpoints;
+see `open_source/inference/unified_prediction/README.md` for expected paths.
 
-### Desktop launcher
+## Repository Map
 
-Run this from the repository root to choose a model in a GUI window:
-
-```bash
-python3 unified_prediction/run_prediction.py
-```
-
-The launcher lets you choose:
-
-- bus-stop or intersection model
-- MediaPipe or trt_pose backend
-- RealSense or webcam source
-- live display or headless video recording
-- optional test duration and output file
-
-You can also select a model directly:
-
-```bash
-# Bus-stop model: straight / yield / overtake
-python3 unified_prediction/run_prediction.py --model bus --pose mediapipe
-python3 unified_prediction/run_prediction.py --model bus --pose trt --bus-swap-upper-labels
-
-# Intersection model: Crossing / LeftTurn / RightTurn
-python3 unified_prediction/run_prediction.py --model intersection --pose trt
-
-# Use a normal OpenCV webcam instead of RealSense
-python3 unified_prediction/run_prediction.py --model bus --camera webcam --webcam-index 0
-
-# SSH/headless test
-python3 unified_prediction/run_prediction.py --model bus --headless --duration 30 -o bus_test.avi
-python3 unified_prediction/run_prediction.py --model intersection --headless --duration 30 -o intersection_test.avi
-```
-
-## Bus-stop Real-time Prediction
-
-```bash
-cd model_package
-python3 bus_stop_predict.py --pose mediapipe
-python3 bus_stop_predict.py --pose trt
-python3 bus_stop_predict.py --pose mediapipe --headless --duration 30 -o bus_stop_test.avi
-```
-
-If the upper-limb left/right labels appear reversed while head direction is correct:
-
-```bash
-python3 bus_stop_predict.py --swap-upper-labels
-```
-
-## Intersection Real-time Prediction
-
-```bash
-cd cyclist_inference
-python3 cyclist_predict.py --pose trt
-python3 cyclist_predict.py --pose mediapipe
-python3 cyclist_predict.py --pose trt --headless --duration 30 -o intersection_test.avi
-```
-
-## Local datasets
-
-The current workspace includes ignored cyclist skeleton, video, parsed trial,
-and result data under `cyclistprediction/`. These files are intentionally not
-tracked because of their size. See
-[`docs/DATASET_INVENTORY.md`](docs/DATASET_INVENTORY.md) for the observed local
-inventory, schemas, intended roles, and handling constraints.
-
-## Public dataset release
-
-The sanitized 2D skeleton subset is published on Hugging Face:
-
-- [Kheyro/cyclist-intention-2d-keypoints](https://huggingface.co/datasets/Kheyro/cyclist-intention-2d-keypoints)
-- CC BY 4.0
-- V5 release: 32 participants, 559 scene clips, and 99,734 frames
-- participant-disjoint train, validation, and test splits
-- Stage1 gesture intervals plus Stage2 `straight`, `yield`, and `overtake` labels
-- no raw video, original filenames, calendar dates, session IDs, source paths,
-  or direct participant IDs
-
-The reproducible V5 builder is `tools/build_hf_dataset_v5.py`. Release construction,
-quality gates, privacy controls, and publication details are documented in
-[`docs/PUBLIC_DATASET_RELEASE.md`](docs/PUBLIC_DATASET_RELEASE.md).
-
-For public training, use the anonymized Hugging Face release rather than local
-raw-data manifests:
-
-```bash
-python tools/prepare_hf_stage2.py --fold 1
-```
-
-This creates the `120 x 66` Stage2 PKL inputs expected by the V5 training code.
-See [`docs/PUBLIC_TRAINING.md`](docs/PUBLIC_TRAINING.md) for the exact workflow,
-scope, and reproducibility limitations.
-
-## Holoscan graph
-
-A reference Holoscan application is provided under `deployment/holoscan/`. It
-separates camera acquisition, pose/model inference, and display/structured
-prediction publication into operators:
-
-The NVIDIA Holoscan runtime must be run on a supported Linux x86_64/CUDA or
-Jetson environment; it is not available as a native Windows Python runtime.
-On Windows, use `.\.venv\Scripts\python.exe unified_prediction\run_web.py`.
-
-```bash
-python3 -m pip install -r deployment/holoscan/requirements.txt
-python3 deployment/holoscan/app.py --model bus --pose mediapipe
-```
-
-See [`deployment/holoscan/README.md`](deployment/holoscan/README.md). The
-synthetic graph is runtime-validated; production-model execution and hardware
-performance still require validation on the target Linux/Jetson device.
-
-The deterministic headless graph was executed in the official Holoscan 3.11
-container. See
-[`docs/HOLOSCAN_SIMULATION_VALIDATION.md`](docs/HOLOSCAN_SIMULATION_VALIDATION.md)
-for the verified outputs and limitations.
-
-The third-party trt_pose ResNet18 checkpoint is not stored in Git. Install it
-from the upstream NVIDIA release with `bash pose_detection/download_models.sh`.
-
-## License
-
-Source code is licensed under the Apache License 2.0. Dataset releases are
-licensed separately under CC BY 4.0. See `LICENSE` and `NOTICE`.
+See `MANIFEST.md` for the full submission-oriented file map.

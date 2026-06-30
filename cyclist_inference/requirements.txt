@@ -1,4 +1,0 @@
-mediapipe
-scikit-learn
-pandas
-numpy
