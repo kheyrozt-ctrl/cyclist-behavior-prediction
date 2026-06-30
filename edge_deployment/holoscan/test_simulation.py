@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from deployment.holoscan.simulation import (
+from edge_deployment.holoscan.simulation import (
     synthetic_frame,
     synthetic_keypoints,
     synthetic_label,

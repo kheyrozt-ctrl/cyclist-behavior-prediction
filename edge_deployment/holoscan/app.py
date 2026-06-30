@@ -49,43 +49,62 @@ class CameraOp(Operator):
     def __init__(
         self,
         fragment,
-        *,
-        index=0,
+        *args,
+        source="realsense",
+        webcam_index=0,
         width=640,
         height=480,
         fps=30,
         duration=0.0,
         **kwargs,
     ):
-        super().__init__(fragment, **kwargs)
-        self.index, self.width, self.height, self.fps = index, width, height, fps
+        super().__init__(fragment, *args, **kwargs)
+        self.source = source
+        self.webcam_index = webcam_index
+        self.width, self.height, self.fps = width, height, fps
         self.duration = duration
-        self.capture = None
+        self.camera = None
         self.started_at = None
 
     def setup(self, spec: OperatorSpec):
         spec.output("frame")
 
     def start(self):
+        from unified_prediction.camera import create_camera
+
         self.started_at = time.monotonic()
-        self.capture = cv2.VideoCapture(self.index)
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        self.capture.set(cv2.CAP_PROP_FPS, self.fps)
-        if not self.capture.isOpened():
-            raise RuntimeError(f"Unable to open webcam index {self.index}")
+        try:
+            self.camera = create_camera(
+                self.source,
+                width=self.width,
+                height=self.height,
+                fps=self.fps,
+                webcam_index=self.webcam_index,
+            )
+        except Exception as exc:
+            if self.source == "realsense":
+                raise RuntimeError(
+                    "Unable to start the RealSense color stream. Check that "
+                    "pyrealsense2 is installed and that no other process is "
+                    "using the camera."
+                ) from exc
+            raise RuntimeError(
+                f"Unable to open webcam index {self.webcam_index}. Use "
+                "--webcam-index to select a different UVC camera, or use "
+                "--camera realsense for an Intel RealSense device."
+            ) from exc
 
     def compute(self, op_input, op_output, context):
         if self.duration > 0 and time.monotonic() - self.started_at >= self.duration:
             raise KeyboardInterrupt
-        ok, frame = self.capture.read()
-        if not ok:
-            raise RuntimeError("Camera frame acquisition failed")
+        frame = self.camera.read()
+        if frame is None:
+            raise RuntimeError(f"{self.source} camera frame acquisition failed")
         op_output.emit({"frame": frame, "timestamp": time.time()}, "frame")
 
     def stop(self):
-        if self.capture is not None:
-            self.capture.release()
+        if self.camera is not None:
+            self.camera.close()
 
 
 class SyntheticCameraOp(Operator):
@@ -206,6 +225,9 @@ class CyclistPredictionOp(Operator):
             from unified_prediction.predictors import create_predictor
             self.predictor = create_predictor(self.runtime_args)
         self.frame_index = 0
+        self.fps_frame_count = 0
+        self.display_fps = 0.0
+        self.fps_started_at = time.perf_counter()
 
     def compute(self, op_input, op_output, context):
         from unified_prediction.runtime import draw_overlay
@@ -220,15 +242,24 @@ class CyclistPredictionOp(Operator):
         keypoints = self.pose.extract_keypoints()
         if keypoints is not None:
             self.predictor.update(keypoints, now)
+
+        self.fps_frame_count += 1
+        fps_elapsed = time.perf_counter() - self.fps_started_at
+        if fps_elapsed >= 1.0:
+            self.display_fps = self.fps_frame_count / fps_elapsed
+            self.fps_frame_count = 0
+            self.fps_started_at = time.perf_counter()
+
         self.pose.draw_skeleton(frame)
         lines = self.predictor.overlay_lines()
-        draw_overlay(frame, self.predictor.title, 0.0, keypoints is not None,
+        draw_overlay(frame, self.predictor.title, self.display_fps, keypoints is not None,
                      lines, self.predictor.progress())
         op_output.emit(frame, "annotated")
         op_output.emit(
             {
                 "frame_index": self.frame_index,
                 "timestamp": now,
+                "fps": round(self.display_fps, 1),
                 "pose_ok": keypoints is not None,
                 "progress": self.predictor.progress(),
                 "lines": [text for text, _ in lines],
@@ -240,6 +271,8 @@ class CyclistPredictionOp(Operator):
     def stop(self):
         if self.pose is not None:
             self.pose.close()
+        if self.predictor is not None and hasattr(self.predictor, "close"):
+            self.predictor.close()
 
 
 class OutputOp(Operator):
@@ -301,14 +334,29 @@ class CyclistPredictionApplication(Application):
                 duration=self.runtime_args.duration,
             )
         else:
+            camera_conditions = []
+            if self.runtime_args.duration > 0:
+                camera_conditions.append(
+                    CountCondition(
+                        self,
+                        max(
+                            1,
+                            int(round(
+                                self.runtime_args.duration * self.runtime_args.fps
+                            )),
+                        ),
+                    )
+                )
             source = CameraOp(
                 self,
+                *camera_conditions,
                 name="camera",
-                index=self.runtime_args.webcam_index,
+                source=self.runtime_args.camera,
+                webcam_index=self.runtime_args.webcam_index,
                 width=self.runtime_args.width,
                 height=self.runtime_args.height,
                 fps=self.runtime_args.fps,
-                duration=self.runtime_args.duration,
+                duration=0.0 if camera_conditions else self.runtime_args.duration,
             )
         inference = CyclistPredictionOp(self, name="cyclist_prediction", args=self.runtime_args)
         display = OutputOp(
@@ -344,7 +392,11 @@ def main():
         choices=("bus", "intersection", "synthetic"),
         default="bus",
     )
-    parser.add_argument("--camera", choices=("webcam", "synthetic"), default="webcam")
+    parser.add_argument(
+        "--camera",
+        choices=("realsense", "webcam", "synthetic"),
+        default="realsense",
+    )
     parser.add_argument("--pose", choices=("mediapipe", "trt", "synthetic"))
     parser.add_argument("--webcam-index", type=int, default=0)
     parser.add_argument("--width", type=int, default=640)

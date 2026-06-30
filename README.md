@@ -42,8 +42,9 @@ Location: `framework_blueprint/`
 
 ## Start Prediction
 
-Prerequisite: install 64-bit Python 3.11 or 3.12. Python 3.13 is not supported
-by the current NumPy/MediaPipe dependency set.
+Prerequisite: install 64-bit Python 3.11 or 3.12 on desktop systems. Jetson
+systems may use JetPack's aarch64 Python 3.8 environment. Python 3.13 is not
+supported by the current NumPy/MediaPipe dependency set.
 
 Recommended Windows entrypoint:
 

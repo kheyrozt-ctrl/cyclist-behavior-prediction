@@ -16,9 +16,22 @@ should run the standard unified web launcher instead:
 Install the graph on the supported Linux/Jetson environment:
 
 ```bash
-python3 -m pip install -r edge_deployment/holoscan/requirements.txt
-python3 edge_deployment/holoscan/app.py --model bus --pose mediapipe
+sh edge_deployment/holoscan/start_holoscan.sh \
+  --model bus \
+  --camera realsense \
+  --pose mediapipe
 ```
+
+On JetPack 5/Python 3.8 the launcher creates an isolated environment with the
+last compatible official SDK wheel, Holoscan 0.6.0. It keeps JetPack-provided
+PyTorch, MediaPipe, CUDA, and camera packages available through
+`--system-site-packages`. Newer CUDA 12 platforms install the current
+`holoscan-cu12` SDK line from the same requirements file.
+
+The default camera is an Intel RealSense color stream, opened through
+`pyrealsense2`. For a regular UVC webcam, use
+`--camera webcam --webcam-index 0`. RealSense exposes several `/dev/video*`
+subdevices, so opening `/dev/video0` directly with OpenCV is not reliable.
 
 ## Headless simulation
 

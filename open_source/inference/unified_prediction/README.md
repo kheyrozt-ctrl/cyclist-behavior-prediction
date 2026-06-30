@@ -5,8 +5,10 @@ the unified cyclist prediction launcher.
 
 ## Launch
 
-Use 64-bit Python 3.11 or 3.12. Python 3.13 is not supported by the current
-NumPy/MediaPipe dependency set.
+Use 64-bit Python 3.11 or 3.12 on desktop systems. Jetson/JetPack systems may
+use the NVIDIA-provided aarch64 Python 3.8 environment so CUDA-enabled PyTorch,
+MediaPipe, and camera packages remain available. Python 3.13 is not supported
+by the current NumPy/MediaPipe dependency set.
 
 Windows:
 

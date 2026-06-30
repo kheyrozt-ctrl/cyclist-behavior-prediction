@@ -143,7 +143,7 @@ def integer(value, name, minimum, maximum):
 def build_args(raw):
     model = raw.get("model", "bus")
     pose = raw.get("pose", "mediapipe")
-    camera = raw.get("camera", "webcam")
+    camera = raw.get("camera", "realsense")
     device = str(raw.get("device", "")).strip() or None
     if model not in ("bus", "intersection"):
         raise ValueError("Unknown model")
